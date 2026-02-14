@@ -19,7 +19,7 @@ const PlatformSelector = ({ selected, onSelect }: Props) => (
             : "bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
         }`}
       >
-        <img src={logo} alt="Pennyekart" className="h-5 shrink-0 sm:h-6" />
+        <img src={logo} alt="Pennyekart" className="h-7 shrink-0 sm:h-8" />
       </button>
 
       {/* Penny Carbs */}
