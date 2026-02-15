@@ -18,6 +18,10 @@ interface Product {
   section: string | null;
 }
 
+interface Category {
+  id: string; name: string; category_type: string;
+}
+
 const sectionOptions = [
   { value: "", label: "None" },
   { value: "most_ordered", label: "Most Ordered Items" },
@@ -29,6 +33,7 @@ const emptyProduct = { name: "", description: "", price: 0, category: "", stock:
 
 const ProductsPage = () => {
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [form, setForm] = useState(emptyProduct);
   const [editId, setEditId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
@@ -41,7 +46,12 @@ const ProductsPage = () => {
     setProducts((data as Product[]) ?? []);
   };
 
-  useEffect(() => { fetchProducts(); }, []);
+  const fetchCategories = async () => {
+    const { data } = await supabase.from("categories").select("id, name, category_type").eq("is_active", true).order("sort_order");
+    setCategories((data as Category[]) ?? []);
+  };
+
+  useEffect(() => { fetchProducts(); fetchCategories(); }, []);
 
   const handleSave = async () => {
     if (editId) {
@@ -82,7 +92,26 @@ const ProductsPage = () => {
                   <div><Label>Price</Label><Input type="number" value={form.price} onChange={(e) => setForm({ ...form, price: +e.target.value })} /></div>
                   <div><Label>Stock</Label><Input type="number" value={form.stock} onChange={(e) => setForm({ ...form, stock: +e.target.value })} /></div>
                 </div>
-                <div><Label>Category</Label><Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} /></div>
+                <div>
+                  <Label>Category</Label>
+                  <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
+                    <option value="">Select category</option>
+                    {categories.filter(c => c.category_type === "grocery").length > 0 && (
+                      <optgroup label="Grocery & Essentials">
+                        {categories.filter(c => c.category_type === "grocery").map(c => (
+                          <option key={c.id} value={c.name}>{c.name}</option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {categories.filter(c => c.category_type !== "grocery").length > 0 && (
+                      <optgroup label="General Categories">
+                        {categories.filter(c => c.category_type !== "grocery").map(c => (
+                          <option key={c.id} value={c.name}>{c.name}</option>
+                        ))}
+                      </optgroup>
+                    )}
+                  </select>
+                </div>
                 <div>
                   <Label>Section</Label>
                   <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={form.section} onChange={(e) => setForm({ ...form, section: e.target.value })}>
