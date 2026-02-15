@@ -1,6 +1,9 @@
 import { Search, User, Wallet, ShoppingCart } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
-const SearchBar = () => (
+const SearchBar = () => {
+  const navigate = useNavigate();
+  return (
   <div className="border-b bg-card">
     <div className="container flex items-center gap-3 py-2.5">
       {/* Search */}
@@ -15,7 +18,7 @@ const SearchBar = () => (
 
       {/* Actions - desktop */}
       <div className="hidden items-center gap-1 sm:flex">
-        <button className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted">
+        <button onClick={() => navigate("/customer/login")} className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted">
           <User className="h-4 w-4" />
           <span>Login</span>
         </button>
@@ -31,7 +34,7 @@ const SearchBar = () => (
 
       {/* Actions - mobile icons only */}
       <div className="flex items-center gap-2 sm:hidden">
-        <button className="rounded-lg p-2 text-foreground hover:bg-muted" aria-label="Login">
+        <button onClick={() => navigate("/customer/login")} className="rounded-lg p-2 text-foreground hover:bg-muted" aria-label="Login">
           <User className="h-5 w-5" />
         </button>
         <button className="rounded-lg p-2 text-foreground hover:bg-muted" aria-label="Cart">
@@ -40,6 +43,7 @@ const SearchBar = () => (
       </div>
     </div>
   </div>
-);
+  );
+};
 
 export default SearchBar;
