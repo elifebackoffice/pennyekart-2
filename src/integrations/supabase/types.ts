@@ -56,6 +56,7 @@ export type Database = {
           created_at: string
           icon: string | null
           id: string
+          image_url: string | null
           is_active: boolean
           item_count: string | null
           name: string
@@ -67,6 +68,7 @@ export type Database = {
           created_at?: string
           icon?: string | null
           id?: string
+          image_url?: string | null
           is_active?: boolean
           item_count?: string | null
           name: string
@@ -78,6 +80,7 @@ export type Database = {
           created_at?: string
           icon?: string | null
           id?: string
+          image_url?: string | null
           is_active?: boolean
           item_count?: string | null
           name?: string

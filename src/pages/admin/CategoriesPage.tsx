@@ -16,10 +16,10 @@ import ImageUpload from "@/components/admin/ImageUpload";
 
 interface Category {
   id: string; name: string; icon: string | null; item_count: string | null;
-  sort_order: number; is_active: boolean; category_type: string;
+  sort_order: number; is_active: boolean; category_type: string; image_url: string | null;
 }
 
-const emptyCategory = { name: "", icon: "", item_count: "", sort_order: 0, is_active: true, category_type: "general" };
+const emptyCategory = { name: "", icon: "", item_count: "", sort_order: 0, is_active: true, category_type: "general", image_url: "" };
 
 const CategoriesPage = () => {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -57,7 +57,7 @@ const CategoriesPage = () => {
   };
 
   const openEdit = (c: Category) => {
-    setForm({ name: c.name, icon: c.icon ?? "", item_count: c.item_count ?? "", sort_order: c.sort_order, is_active: c.is_active, category_type: c.category_type });
+    setForm({ name: c.name, icon: c.icon ?? "", item_count: c.item_count ?? "", sort_order: c.sort_order, is_active: c.is_active, category_type: c.category_type, image_url: c.image_url ?? "" });
     setEditId(c.id); setOpen(true);
   };
 
@@ -75,7 +75,7 @@ const CategoriesPage = () => {
               <div className="space-y-3">
                 <div><Label>Name</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
                 <div><Label>Icon Name (Lucide)</Label><Input value={form.icon} onChange={(e) => setForm({ ...form, icon: e.target.value })} placeholder="e.g. Apple, Shirt, Smartphone" /></div>
-                <ImageUpload bucket="categories" value={form.item_count} onChange={(url) => setForm({ ...form, item_count: url })} label="Category Image" />
+                <ImageUpload bucket="categories" value={form.image_url} onChange={(url) => setForm({ ...form, image_url: url })} label="Category Image" />
                 {tab === "general" && (
                   <div><Label>Item Count</Label><Input value={form.item_count} onChange={(e) => setForm({ ...form, item_count: e.target.value })} placeholder="e.g. 2,400+" /></div>
                 )}
