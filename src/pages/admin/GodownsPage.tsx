@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Warehouse, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -35,6 +35,13 @@ interface GodownLocalBody {
   locations_local_bodies?: LocalBody;
 }
 
+interface GodownWard {
+  id: string;
+  godown_id: string;
+  local_body_id: string;
+  ward_number: number;
+}
+
 const GODOWN_TYPES = [
   { value: "micro", label: "Micro Godown", desc: "Under one panchayath, multi wards. Customer visible." },
   { value: "local", label: "Local Godown", desc: "Multi panchayath backup. Not customer visible." },
@@ -46,11 +53,14 @@ const GodownsPage = () => {
   const [godowns, setGodowns] = useState<Godown[]>([]);
   const [localBodies, setLocalBodies] = useState<LocalBody[]>([]);
   const [godownLocalBodies, setGodownLocalBodies] = useState<GodownLocalBody[]>([]);
+  const [godownWards, setGodownWards] = useState<GodownWard[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [selectedGodown, setSelectedGodown] = useState<Godown | null>(null);
   const [form, setForm] = useState({ name: "", godown_type: "micro" });
   const [assignLocalBodyId, setAssignLocalBodyId] = useState("");
+  const [selectedWards, setSelectedWards] = useState<number[]>([]);
+  const [allWards, setAllWards] = useState(false);
   const [activeTab, setActiveTab] = useState("micro");
 
   const fetchGodowns = async () => {
@@ -68,7 +78,12 @@ const GodownsPage = () => {
     if (data) setGodownLocalBodies(data as unknown as GodownLocalBody[]);
   };
 
-  useEffect(() => { fetchGodowns(); fetchLocalBodies(); fetchGodownLocalBodies(); }, []);
+  const fetchGodownWards = async () => {
+    const { data } = await supabase.from("godown_wards").select("*");
+    if (data) setGodownWards(data as GodownWard[]);
+  };
+
+  useEffect(() => { fetchGodowns(); fetchLocalBodies(); fetchGodownLocalBodies(); fetchGodownWards(); }, []);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,24 +92,103 @@ const GodownsPage = () => {
     else { toast({ title: "Godown created" }); setDialogOpen(false); setForm({ name: "", godown_type: "micro" }); fetchGodowns(); }
   };
 
+  const selectedLocalBody = localBodies.find(lb => lb.id === assignLocalBodyId);
+  const isMicroGodown = selectedGodown?.godown_type === "micro";
+
   const handleAssign = async () => {
     if (!selectedGodown || !assignLocalBodyId) return;
-    const { error } = await supabase.from("godown_local_bodies").insert({ godown_id: selectedGodown.id, local_body_id: assignLocalBodyId });
-    if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
-    else { toast({ title: "Panchayath assigned" }); setAssignLocalBodyId(""); fetchGodownLocalBodies(); }
+
+    if (isMicroGodown) {
+      // For micro godowns, assign wards
+      const wardNumbers = allWards
+        ? Array.from({ length: selectedLocalBody?.ward_count ?? 0 }, (_, i) => i + 1)
+        : selectedWards;
+
+      if (wardNumbers.length === 0) {
+        toast({ title: "Select at least one ward", variant: "destructive" });
+        return;
+      }
+
+      // Also add to godown_local_bodies if not already there
+      const existing = godownLocalBodies.find(
+        glb => glb.godown_id === selectedGodown.id && glb.local_body_id === assignLocalBodyId
+      );
+      if (!existing) {
+        await supabase.from("godown_local_bodies").insert({ godown_id: selectedGodown.id, local_body_id: assignLocalBodyId });
+      }
+
+      // Remove existing wards for this godown+local_body combo, then insert new
+      const existingWards = godownWards.filter(
+        w => w.godown_id === selectedGodown.id && w.local_body_id === assignLocalBodyId
+      );
+      if (existingWards.length > 0) {
+        await supabase.from("godown_wards").delete().in("id", existingWards.map(w => w.id));
+      }
+
+      const rows = wardNumbers.map(wn => ({
+        godown_id: selectedGodown.id,
+        local_body_id: assignLocalBodyId,
+        ward_number: wn,
+      }));
+      const { error } = await supabase.from("godown_wards").insert(rows);
+      if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
+      else toast({ title: `${wardNumbers.length} ward(s) assigned` });
+    } else {
+      // For local/area godowns, just assign panchayath
+      const { error } = await supabase.from("godown_local_bodies").insert({ godown_id: selectedGodown.id, local_body_id: assignLocalBodyId });
+      if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
+      else toast({ title: "Panchayath assigned" });
+    }
+
+    resetAssignForm();
+    fetchGodownLocalBodies();
+    fetchGodownWards();
   };
 
-  const handleRemoveAssignment = async (id: string) => {
-    await supabase.from("godown_local_bodies").delete().eq("id", id);
+  const resetAssignForm = () => {
+    setAssignLocalBodyId("");
+    setSelectedWards([]);
+    setAllWards(false);
+  };
+
+  const handleRemoveAssignment = async (glbId: string, godownId: string, localBodyId: string) => {
+    // Remove ward assignments too
+    const wardsToRemove = godownWards.filter(w => w.godown_id === godownId && w.local_body_id === localBodyId);
+    if (wardsToRemove.length > 0) {
+      await supabase.from("godown_wards").delete().in("id", wardsToRemove.map(w => w.id));
+    }
+    await supabase.from("godown_local_bodies").delete().eq("id", glbId);
     fetchGodownLocalBodies();
+    fetchGodownWards();
   };
 
   const handleDelete = async (id: string) => {
     await supabase.from("godowns").delete().eq("id", id);
-    fetchGodowns(); fetchGodownLocalBodies();
+    fetchGodowns(); fetchGodownLocalBodies(); fetchGodownWards();
+  };
+
+  const toggleWard = (ward: number) => {
+    setAllWards(false);
+    setSelectedWards(prev => prev.includes(ward) ? prev.filter(w => w !== ward) : [...prev, ward]);
+  };
+
+  const handleAllWardsChange = (checked: boolean) => {
+    setAllWards(checked);
+    if (checked && selectedLocalBody) {
+      setSelectedWards(Array.from({ length: selectedLocalBody.ward_count }, (_, i) => i + 1));
+    } else {
+      setSelectedWards([]);
+    }
   };
 
   const filteredGodowns = godowns.filter(g => g.godown_type === activeTab);
+
+  const getWardsForAssignment = (godownId: string, localBodyId: string) => {
+    return godownWards
+      .filter(w => w.godown_id === godownId && w.local_body_id === localBodyId)
+      .map(w => w.ward_number)
+      .sort((a, b) => a - b);
+  };
 
   return (
     <AdminLayout>
@@ -148,8 +242,8 @@ const GodownsPage = () => {
                           <Badge variant={g.is_active ? "default" : "secondary"}>{g.is_active ? "Active" : "Inactive"}</Badge>
                         </div>
                         <div className="flex gap-2">
-                          <Button size="sm" variant="outline" onClick={() => { setSelectedGodown(g); setAssignDialogOpen(true); }}>
-                            Assign Panchayath
+                          <Button size="sm" variant="outline" onClick={() => { setSelectedGodown(g); resetAssignForm(); setAssignDialogOpen(true); }}>
+                            {g.godown_type === "micro" ? "Assign Wards" : "Assign Panchayath"}
                           </Button>
                           <Button size="sm" variant="destructive" onClick={() => handleDelete(g.id)}>
                             <Trash2 className="h-4 w-4" />
@@ -157,17 +251,31 @@ const GodownsPage = () => {
                         </div>
                       </CardHeader>
                       <CardContent>
-                        <p className="mb-2 text-sm text-muted-foreground">Assigned Panchayaths:</p>
+                        <p className="mb-2 text-sm text-muted-foreground">
+                          {g.godown_type === "micro" ? "Assigned Panchayaths & Wards:" : "Assigned Panchayaths:"}
+                        </p>
                         {assignments.length === 0 ? (
                           <p className="text-sm text-muted-foreground italic">None assigned</p>
                         ) : (
-                          <div className="flex flex-wrap gap-2">
-                            {assignments.map(a => (
-                              <Badge key={a.id} variant="outline" className="gap-1">
-                                {a.locations_local_bodies?.name ?? "Unknown"}
-                                <button onClick={() => handleRemoveAssignment(a.id)} className="ml-1 text-destructive hover:text-destructive/80">×</button>
-                              </Badge>
-                            ))}
+                          <div className="space-y-2">
+                            {assignments.map(a => {
+                              const wards = getWardsForAssignment(g.id, a.local_body_id);
+                              const lb = a.locations_local_bodies;
+                              const isAllWards = lb && wards.length === lb.ward_count;
+                              return (
+                                <div key={a.id} className="flex items-center gap-2 flex-wrap">
+                                  <Badge variant="outline" className="gap-1">
+                                    {lb?.name ?? "Unknown"}
+                                    <button onClick={() => handleRemoveAssignment(a.id, g.id, a.local_body_id)} className="ml-1 text-destructive hover:text-destructive/80">×</button>
+                                  </Badge>
+                                  {g.godown_type === "micro" && wards.length > 0 && (
+                                    <span className="text-xs text-muted-foreground">
+                                      {isAllWards ? "All wards" : `Ward ${wards.join(", ")}`}
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
                         )}
                       </CardContent>
@@ -179,17 +287,55 @@ const GodownsPage = () => {
           ))}
         </Tabs>
 
-        <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
-          <DialogContent>
-            <DialogHeader><DialogTitle>Assign Panchayath to {selectedGodown?.name}</DialogTitle></DialogHeader>
+        <Dialog open={assignDialogOpen} onOpenChange={(open) => { setAssignDialogOpen(open); if (!open) resetAssignForm(); }}>
+          <DialogContent className="max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>
+                {isMicroGodown ? `Assign Wards to ${selectedGodown?.name}` : `Assign Panchayath to ${selectedGodown?.name}`}
+              </DialogTitle>
+            </DialogHeader>
             <div className="space-y-4">
-              <Select value={assignLocalBodyId} onValueChange={setAssignLocalBodyId}>
-                <SelectTrigger><SelectValue placeholder="Select panchayath" /></SelectTrigger>
-                <SelectContent>
-                  {localBodies.map(lb => <SelectItem key={lb.id} value={lb.id}>{lb.name} ({lb.body_type})</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Button onClick={handleAssign} disabled={!assignLocalBodyId} className="w-full">Assign</Button>
+              <div>
+                <Label>Select Panchayath</Label>
+                <Select value={assignLocalBodyId} onValueChange={(v) => { setAssignLocalBodyId(v); setSelectedWards([]); setAllWards(false); }}>
+                  <SelectTrigger><SelectValue placeholder="Select panchayath" /></SelectTrigger>
+                  <SelectContent>
+                    {localBodies.map(lb => <SelectItem key={lb.id} value={lb.id}>{lb.name} ({lb.body_type})</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {isMicroGodown && assignLocalBodyId && selectedLocalBody && (
+                <div>
+                  <Label className="mb-2 block">Select Wards ({selectedLocalBody.ward_count} total)</Label>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Checkbox id="all-wards" checked={allWards} onCheckedChange={(c) => handleAllWardsChange(!!c)} />
+                    <label htmlFor="all-wards" className="text-sm font-medium cursor-pointer">All Wards</label>
+                  </div>
+                  <div className="grid grid-cols-5 gap-2 max-h-48 overflow-y-auto">
+                    {Array.from({ length: selectedLocalBody.ward_count }, (_, i) => i + 1).map(ward => (
+                      <label key={ward} className="flex items-center gap-1.5 text-sm cursor-pointer">
+                        <Checkbox
+                          checked={selectedWards.includes(ward)}
+                          onCheckedChange={() => toggleWard(ward)}
+                        />
+                        {ward}
+                      </label>
+                    ))}
+                  </div>
+                  {selectedWards.length > 0 && (
+                    <p className="mt-2 text-xs text-muted-foreground">{selectedWards.length} ward(s) selected</p>
+                  )}
+                </div>
+              )}
+
+              <Button
+                onClick={handleAssign}
+                disabled={!assignLocalBodyId || (isMicroGodown && selectedWards.length === 0)}
+                className="w-full"
+              >
+                Assign
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
