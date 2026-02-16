@@ -22,6 +22,8 @@ import ServicesPage from "./pages/admin/ServicesPage";
 import LocationsPage from "./pages/admin/LocationsPage";
 import GodownsPage from "./pages/admin/GodownsPage";
 import PurchasePage from "./pages/admin/PurchasePage";
+import DeliveryManagementPage from "./pages/admin/DeliveryManagementPage";
+import SellingPartnersPage from "./pages/admin/SellingPartnersPage";
 import PennyServices from "./pages/PennyServices";
 import DeliveryStaffSignup from "./pages/delivery-staff/Signup";
 import DeliveryStaffLogin from "./pages/delivery-staff/Login";
@@ -62,6 +64,8 @@ const App = () => {
               <Route path="/admin/locations" element={<ProtectedRoute requirePermission="read_locations"><LocationsPage /></ProtectedRoute>} />
               <Route path="/admin/godowns" element={<ProtectedRoute requirePermission="read_godowns"><GodownsPage /></ProtectedRoute>} />
               <Route path="/admin/purchase" element={<ProtectedRoute requirePermission="create_stock"><PurchasePage /></ProtectedRoute>} />
+              <Route path="/admin/delivery" element={<ProtectedRoute requirePermission="read_users"><DeliveryManagementPage /></ProtectedRoute>} />
+              <Route path="/admin/sellers" element={<ProtectedRoute requirePermission="read_users"><SellingPartnersPage /></ProtectedRoute>} />
               <Route path="/services" element={<PennyServices />} />
 
               {/* Delivery Staff */}
