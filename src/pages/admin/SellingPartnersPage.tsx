@@ -9,8 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { Search, Store, Phone, Mail, Package, Eye, MapPin, Wallet } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Search, Store, Phone, Mail, Package, Eye, MapPin, Wallet, User, Calendar } from "lucide-react";
 
 interface SellingPartner {
   id: string;
@@ -20,7 +19,14 @@ interface SellingPartner {
   mobile_number: string | null;
   is_approved: boolean;
   created_at: string;
+  ward_number: number | null;
+  local_body_id: string | null;
+  date_of_birth: string | null;
+  avatar_url: string | null;
   product_count?: number;
+  local_body_name?: string;
+  district_name?: string;
+  body_type?: string;
 }
 
 interface SellerProduct {
@@ -30,8 +36,12 @@ interface SellerProduct {
   stock: number;
   is_active: boolean;
   is_approved: boolean;
+  is_featured: boolean;
   image_url: string | null;
   category: string | null;
+  mrp: number;
+  purchase_rate: number;
+  discount_rate: number;
 }
 
 interface Godown {
@@ -58,13 +68,16 @@ const SellingPartnersPage = () => {
   const [walletInfo, setWalletInfo] = useState<WalletInfo | null>(null);
   const [walletPartner, setWalletPartner] = useState<SellingPartner | null>(null);
   const [settleAmount, setSettleAmount] = useState("");
+  const [detailPartner, setDetailPartner] = useState<SellingPartner | null>(null);
   const { toast } = useToast();
 
   const fetchPartners = async () => {
     setLoading(true);
-    const [profilesRes, productsRes] = await Promise.all([
+    const [profilesRes, productsRes, localBodiesRes, districtsRes] = await Promise.all([
       supabase.from("profiles").select("*").eq("user_type", "selling_partner"),
       supabase.from("seller_products").select("seller_id"),
+      supabase.from("locations_local_bodies").select("id, name, body_type, district_id"),
+      supabase.from("locations_districts").select("id, name"),
     ]);
 
     const productCounts: Record<string, number> = {};
@@ -72,12 +85,28 @@ const SellingPartnersPage = () => {
       productCounts[p.seller_id] = (productCounts[p.seller_id] || 0) + 1;
     });
 
-    const enriched = ((profilesRes.data ?? []) as unknown as SellingPartner[]).map((p) => ({
-      ...p,
-      product_count: productCounts[p.user_id] || 0,
-    }));
+    const localBodiesMap: Record<string, { name: string; body_type: string; district_id: string }> = {};
+    (localBodiesRes.data ?? []).forEach((lb) => {
+      localBodiesMap[lb.id] = { name: lb.name, body_type: lb.body_type, district_id: lb.district_id };
+    });
 
-    setPartners(enriched);
+    const districtsMap: Record<string, string> = {};
+    (districtsRes.data ?? []).forEach((d) => {
+      districtsMap[d.id] = d.name;
+    });
+
+    const enriched = ((profilesRes.data ?? []) as unknown as SellingPartner[]).map((p) => {
+      const lb = p.local_body_id ? localBodiesMap[p.local_body_id] : null;
+      return {
+        ...p,
+        product_count: productCounts[p.user_id] || 0,
+        local_body_name: lb?.name ?? null,
+        body_type: lb?.body_type ?? null,
+        district_name: lb ? districtsMap[lb.district_id] ?? null : null,
+      };
+    });
+
+    setPartners(enriched as SellingPartner[]);
     setLoading(false);
   };
 
@@ -104,6 +133,16 @@ const SellingPartnersPage = () => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
       toast({ title: !current ? "Product approved" : "Product unapproved" });
+      viewProducts(selectedPartner!);
+    }
+  };
+
+  const toggleProductFeatured = async (productId: string, current: boolean) => {
+    const { error } = await supabase.from("seller_products").update({ is_featured: !current }).eq("id", productId);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: !current ? "Product featured" : "Product unfeatured" });
       viewProducts(selectedPartner!);
     }
   };
@@ -150,7 +189,7 @@ const SellingPartnersPage = () => {
     if (!walletPartner || !settleAmount) return;
     const amount = parseFloat(settleAmount);
     if (isNaN(amount) || amount <= 0) return;
-    
+
     const { data: wallet } = await supabase.from("seller_wallets").select("*").eq("seller_id", walletPartner.user_id).maybeSingle();
     if (!wallet || wallet.balance < amount) {
       toast({ title: "Insufficient balance", variant: "destructive" });
@@ -174,7 +213,7 @@ const SellingPartnersPage = () => {
   const filtered = partners.filter((p) => {
     if (!search) return true;
     const q = search.toLowerCase();
-    return p.full_name?.toLowerCase().includes(q) || p.email?.toLowerCase().includes(q) || p.mobile_number?.includes(q);
+    return p.full_name?.toLowerCase().includes(q) || p.email?.toLowerCase().includes(q) || p.mobile_number?.includes(q) || p.local_body_name?.toLowerCase().includes(q);
   });
 
   const approvedCount = partners.filter((p) => p.is_approved).length;
@@ -199,7 +238,7 @@ const SellingPartnersPage = () => {
 
         <div className="relative max-w-sm">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input placeholder="Search by name, email, or phone..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+          <Input placeholder="Search by name, email, phone, panchayath..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
         </div>
 
         <div className="rounded-lg border bg-card overflow-x-auto">
@@ -208,8 +247,8 @@ const SellingPartnersPage = () => {
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Contact</TableHead>
+                <TableHead>Panchayath / Ward</TableHead>
                 <TableHead>Products</TableHead>
-                <TableHead>Joined</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Approved</TableHead>
                 <TableHead>Actions</TableHead>
@@ -230,13 +269,29 @@ const SellingPartnersPage = () => {
                     </div>
                   </TableCell>
                   <TableCell>
+                    <div className="space-y-0.5 text-sm">
+                      {p.local_body_name ? (
+                        <>
+                          <div className="font-medium">{p.local_body_name}</div>
+                          <div className="text-muted-foreground text-xs">
+                            {p.body_type && <span className="capitalize">{p.body_type}</span>}
+                            {p.ward_number && <span> · Ward {p.ward_number}</span>}
+                            {p.district_name && <span> · {p.district_name}</span>}
+                          </div>
+                        </>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
                     <Badge variant="outline" className="gap-1"><Package className="h-3 w-3" />{p.product_count}</Badge>
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{new Date(p.created_at).toLocaleDateString()}</TableCell>
                   <TableCell><Badge variant={p.is_approved ? "default" : "secondary"}>{p.is_approved ? "Active" : "Pending"}</Badge></TableCell>
                   <TableCell><Switch checked={p.is_approved} onCheckedChange={() => toggleApproval(p.user_id, p.is_approved)} /></TableCell>
                   <TableCell>
                     <div className="flex gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => setDetailPartner(p)} title="View Details"><User className="h-4 w-4" /></Button>
                       <Button variant="ghost" size="sm" onClick={() => viewProducts(p)} title="Products"><Eye className="h-4 w-4" /></Button>
                       <Button variant="ghost" size="sm" onClick={() => openGodownAssignment(p)} title="Assign Godowns"><MapPin className="h-4 w-4" /></Button>
                       <Button variant="ghost" size="sm" onClick={() => openWallet(p)} title="Wallet"><Wallet className="h-4 w-4" /></Button>
@@ -249,9 +304,47 @@ const SellingPartnersPage = () => {
         </div>
       </div>
 
+      {/* View Details Dialog */}
+      <Dialog open={!!detailPartner} onOpenChange={() => setDetailPartner(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Partner Details</DialogTitle></DialogHeader>
+          {detailPartner && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-4">
+                {detailPartner.avatar_url ? (
+                  <img src={detailPartner.avatar_url} alt="" className="h-16 w-16 rounded-full object-cover border" />
+                ) : (
+                  <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
+                    <User className="h-8 w-8 text-muted-foreground" />
+                  </div>
+                )}
+                <div>
+                  <h3 className="text-lg font-semibold">{detailPartner.full_name ?? "—"}</h3>
+                  <Badge variant={detailPartner.is_approved ? "default" : "secondary"}>
+                    {detailPartner.is_approved ? "Active" : "Pending"}
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <DetailItem label="Email" value={detailPartner.email} />
+                <DetailItem label="Mobile" value={detailPartner.mobile_number} />
+                <DetailItem label="Date of Birth" value={detailPartner.date_of_birth ? new Date(detailPartner.date_of_birth).toLocaleDateString() : null} />
+                <DetailItem label="Joined" value={new Date(detailPartner.created_at).toLocaleDateString()} />
+                <DetailItem label="Local Body" value={detailPartner.local_body_name} />
+                <DetailItem label="Type" value={detailPartner.body_type} capitalize />
+                <DetailItem label="Ward" value={detailPartner.ward_number?.toString()} />
+                <DetailItem label="District" value={detailPartner.district_name} />
+                <DetailItem label="Products" value={detailPartner.product_count?.toString() ?? "0"} />
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Products Dialog */}
       <Dialog open={!!selectedPartner} onOpenChange={() => setSelectedPartner(null)}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Products by {selectedPartner?.full_name ?? "Partner"}</DialogTitle></DialogHeader>
           {productsLoading ? (
             <p className="text-center py-4 text-muted-foreground">Loading...</p>
@@ -262,17 +355,33 @@ const SellingPartnersPage = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Product</TableHead>
+                  <TableHead>MRP</TableHead>
+                  <TableHead>Purchase</TableHead>
+                  <TableHead>Discount</TableHead>
                   <TableHead>Price</TableHead>
                   <TableHead>Stock</TableHead>
+                  <TableHead>Featured</TableHead>
                   <TableHead>Approved</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {partnerProducts.map((prod) => (
                   <TableRow key={prod.id}>
-                    <TableCell className="font-medium">{prod.name}</TableCell>
-                    <TableCell>₹{prod.price}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        {prod.image_url && <img src={prod.image_url} alt="" className="h-8 w-8 rounded object-cover" />}
+                        <div>
+                          <p className="font-medium">{prod.name}</p>
+                          {prod.category && <p className="text-xs text-muted-foreground">{prod.category}</p>}
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>₹{prod.mrp}</TableCell>
+                    <TableCell className="text-muted-foreground">₹{prod.purchase_rate}</TableCell>
+                    <TableCell className="text-muted-foreground">₹{prod.discount_rate}</TableCell>
+                    <TableCell className="font-medium">₹{prod.price}</TableCell>
                     <TableCell>{prod.stock}</TableCell>
+                    <TableCell><Switch checked={prod.is_featured} onCheckedChange={() => toggleProductFeatured(prod.id, prod.is_featured)} /></TableCell>
                     <TableCell><Switch checked={prod.is_approved} onCheckedChange={() => toggleProductApproval(prod.id, prod.is_approved)} /></TableCell>
                   </TableRow>
                 ))}
@@ -342,5 +451,12 @@ const SellingPartnersPage = () => {
     </AdminLayout>
   );
 };
+
+const DetailItem = ({ label, value, capitalize }: { label: string; value?: string | null; capitalize?: boolean }) => (
+  <div>
+    <p className="text-muted-foreground text-xs">{label}</p>
+    <p className={`font-medium ${capitalize ? "capitalize" : ""}`}>{value ?? "—"}</p>
+  </div>
+);
 
 export default SellingPartnersPage;
