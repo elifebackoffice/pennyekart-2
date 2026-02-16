@@ -373,7 +373,51 @@ const GodownsPage = () => {
   };
 
   const handleUpdateTransferStatus = async (transferId: string, status: string) => {
+    // Find the transfer details first
+    const transfer = stockTransfers.find(t => t.id === transferId);
+    
     await supabase.from("stock_transfers").update({ status }).eq("id", transferId);
+
+    // When completing a transfer, update godown_stock for destination and deduct from source
+    if (status === "completed" && transfer) {
+      const productId = typeof transfer.products === "object" && transfer.products ? (transfer.products as any).id : transfer.product_id;
+      const qty = transfer.quantity;
+
+      // Add stock to destination godown
+      const { data: existingDest } = await supabase
+        .from("godown_stock")
+        .select("id, quantity")
+        .eq("godown_id", transfer.to_godown_id)
+        .eq("product_id", productId)
+        .maybeSingle();
+
+      if (existingDest) {
+        await supabase.from("godown_stock").update({ quantity: existingDest.quantity + qty }).eq("id", existingDest.id);
+      } else {
+        await supabase.from("godown_stock").insert({
+          godown_id: transfer.to_godown_id,
+          product_id: productId,
+          quantity: qty,
+          purchase_price: 0,
+        });
+      }
+
+      // Deduct stock from source godown
+      const { data: existingSrc } = await supabase
+        .from("godown_stock")
+        .select("id, quantity")
+        .eq("godown_id", transfer.from_godown_id)
+        .eq("product_id", productId)
+        .maybeSingle();
+
+      if (existingSrc) {
+        const newQty = Math.max(0, existingSrc.quantity - qty);
+        await supabase.from("godown_stock").update({ quantity: newQty }).eq("id", existingSrc.id);
+      }
+
+      fetchGodownStock();
+    }
+
     fetchStockTransfers();
     toast({ title: `Transfer ${status}` });
   };
