@@ -530,19 +530,119 @@ const GodownsPage = () => {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-8"></TableHead>
                   <TableHead>Product</TableHead>
                   <TableHead>Total Qty</TableHead>
                   <TableHead>MRP</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {groupedList.map(([pid, info]) => (
-                  <TableRow key={pid}>
-                    <TableCell className="font-medium">{info.product_name}</TableCell>
-                    <TableCell>{info.total_qty}</TableCell>
-                    <TableCell>₹{info.mrp}</TableCell>
-                  </TableRow>
-                ))}
+                {groupedList.map(([pid, info]) => {
+                  const itemKey = `${g.id}-${pid}`;
+                  const isExpanded = expandedStockItems[itemKey] ?? false;
+                  const itemPurchases = stock.filter(s => s.product_id === pid);
+                  const itemTransfers = stockTransfers.filter(
+                    t => t.product_id === pid && (t.from_godown_id === g.id || t.to_godown_id === g.id)
+                  );
+                  return (
+                    <>
+                      <TableRow
+                        key={pid}
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => toggleStockItem(itemKey)}
+                      >
+                        <TableCell className="px-2">
+                          {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                        </TableCell>
+                        <TableCell className="font-medium">{info.product_name}</TableCell>
+                        <TableCell>
+                          <Badge variant={info.total_qty > 0 ? "default" : "destructive"}>{info.total_qty}</Badge>
+                        </TableCell>
+                        <TableCell>₹{info.mrp}</TableCell>
+                      </TableRow>
+                      {isExpanded && (
+                        <TableRow key={`${pid}-details`}>
+                          <TableCell colSpan={4} className="bg-muted/30 p-0">
+                            <div className="p-3 space-y-3">
+                              {/* Purchase Entries */}
+                              <div>
+                                <p className="text-xs font-semibold text-muted-foreground mb-1">Purchase Entries ({itemPurchases.length})</p>
+                                {itemPurchases.length === 0 ? (
+                                  <p className="text-xs text-muted-foreground italic">No purchases</p>
+                                ) : (
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow>
+                                        <TableHead className="text-xs">Date</TableHead>
+                                        <TableHead className="text-xs">Bill No.</TableHead>
+                                        <TableHead className="text-xs">Qty</TableHead>
+                                        <TableHead className="text-xs">Purchase ₹</TableHead>
+                                        <TableHead className="text-xs">Batch</TableHead>
+                                        <TableHead className="text-xs">Expiry</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {itemPurchases.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).map(s => (
+                                        <TableRow key={s.id}>
+                                          <TableCell className="text-xs">{new Date(s.created_at).toLocaleDateString()}</TableCell>
+                                          <TableCell className="text-xs font-mono">{s.purchase_number || "-"}</TableCell>
+                                          <TableCell className="text-xs">{s.quantity}</TableCell>
+                                          <TableCell className="text-xs">₹{s.purchase_price}</TableCell>
+                                          <TableCell className="text-xs">{s.batch_number || "-"}</TableCell>
+                                          <TableCell className="text-xs">{s.expiry_date || "-"}</TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
+                                )}
+                              </div>
+                              {/* Transfer History */}
+                              <div>
+                                <p className="text-xs font-semibold text-muted-foreground mb-1">Transfer History ({itemTransfers.length})</p>
+                                {itemTransfers.length === 0 ? (
+                                  <p className="text-xs text-muted-foreground italic">No transfers</p>
+                                ) : (
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow>
+                                        <TableHead className="text-xs">Date</TableHead>
+                                        <TableHead className="text-xs">From</TableHead>
+                                        <TableHead className="text-xs">To</TableHead>
+                                        <TableHead className="text-xs">Qty</TableHead>
+                                        <TableHead className="text-xs">Type</TableHead>
+                                        <TableHead className="text-xs">Status</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {itemTransfers.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).map(t => (
+                                        <TableRow key={t.id}>
+                                          <TableCell className="text-xs">{new Date(t.created_at).toLocaleDateString()}</TableCell>
+                                          <TableCell className="text-xs">{t.from_godown?.name ?? "Unknown"}</TableCell>
+                                          <TableCell className="text-xs">{t.to_godown?.name ?? "Unknown"}</TableCell>
+                                          <TableCell className="text-xs">{t.quantity}</TableCell>
+                                          <TableCell className="text-xs">
+                                            <Badge variant={t.transfer_type === "return" ? "secondary" : "default"} className="text-[10px]">
+                                              {t.transfer_type === "return" ? "Return" : "Transfer"}
+                                            </Badge>
+                                          </TableCell>
+                                          <TableCell className="text-xs">
+                                            <Badge variant={t.status === "completed" ? "default" : t.status === "pending" ? "secondary" : "destructive"} className="text-[10px]">
+                                              {t.status}
+                                            </Badge>
+                                          </TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
+                                )}
+                              </div>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
@@ -587,6 +687,11 @@ const GodownsPage = () => {
   };
 
   const [expandedBills, setExpandedBills] = useState<Record<string, boolean>>({});
+  const [expandedStockItems, setExpandedStockItems] = useState<Record<string, boolean>>({});
+
+  const toggleStockItem = (key: string) => {
+    setExpandedStockItems(prev => ({ ...prev, [key]: !prev[key] }));
+  };
 
   const toggleBill = (billKey: string) => {
     setExpandedBills(prev => ({ ...prev, [billKey]: !prev[billKey] }));
