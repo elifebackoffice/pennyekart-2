@@ -1,14 +1,34 @@
 import logo from "@/assets/logo.png";
-import { ShoppingCart, Menu, X, User, LogOut } from "lucide-react";
-import { useState } from "react";
+import { ShoppingCart, Menu, X, User, LogOut, Package, MapPin, Heart, Bell, ChevronDown } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 
 const Navbar = () => {
   const [open, setOpen] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { user, profile, signOut } = useAuth();
   const links = ["Home", "Categories", "Deals", "About", "Contact"];
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const menuItems = [
+    { icon: User, label: "My Profile", action: () => navigate("/customer/profile") },
+    { icon: Package, label: "Orders", action: () => navigate("/customer/profile") },
+    { icon: MapPin, label: "Saved Addresses", action: () => navigate("/customer/profile") },
+    { icon: Heart, label: "Wishlist", action: () => navigate("/customer/profile") },
+    { icon: Bell, label: "Notifications", action: () => navigate("/customer/profile") },
+  ];
 
   return (
     <nav className="sticky top-0 z-50 border-b bg-card/80 backdrop-blur-md">
@@ -30,24 +50,47 @@ const Navbar = () => {
             <ShoppingCart className="h-5 w-5" />
           </button>
           {user ? (
-            <div className="flex items-center gap-2">
+            <div className="relative" ref={dropdownRef}>
               <button
-                className="flex items-center gap-1.5 text-foreground"
-                onClick={() => navigate("/customer/profile")}
-                aria-label="Profile"
+                className="flex items-center gap-1.5 text-foreground hover:text-primary transition-colors"
+                onClick={() => setDropdownOpen(!dropdownOpen)}
+                aria-label="Account menu"
               >
-                <User className="h-5 w-5" />
+                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
+                  <User className="h-4 w-4 text-primary" />
+                </div>
                 <span className="text-sm font-medium hidden sm:inline max-w-[100px] truncate">
                   {profile?.full_name || user.email?.split("@")[0] || "Account"}
                 </span>
+                <ChevronDown className={`h-3.5 w-3.5 hidden sm:block transition-transform ${dropdownOpen ? "rotate-180" : ""}`} />
               </button>
-              <button
-                className="text-muted-foreground hover:text-foreground"
-                onClick={async () => { await signOut(); navigate("/"); }}
-                aria-label="Logout"
-              >
-                <LogOut className="h-4 w-4" />
-              </button>
+
+              {dropdownOpen && (
+                <div className="absolute right-0 top-full mt-2 w-56 bg-card rounded-lg border shadow-lg z-50 py-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                  <div className="px-4 py-2 border-b mb-1">
+                    <p className="text-sm font-semibold">Your Account</p>
+                  </div>
+                  {menuItems.map((item) => (
+                    <button
+                      key={item.label}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                      onClick={() => { item.action(); setDropdownOpen(false); }}
+                    >
+                      <item.icon className="h-4 w-4" />
+                      {item.label}
+                    </button>
+                  ))}
+                  <div className="border-t mt-1 pt-1">
+                    <button
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-destructive hover:bg-destructive/10 transition-colors"
+                      onClick={async () => { await signOut(); navigate("/"); setDropdownOpen(false); }}
+                    >
+                      <LogOut className="h-4 w-4" />
+                      Logout
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <button
