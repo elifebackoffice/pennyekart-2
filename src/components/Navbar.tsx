@@ -1,9 +1,11 @@
 import logo from "@/assets/logo.png";
-import { ShoppingCart, Menu, X } from "lucide-react";
+import { ShoppingCart, Menu, X, User } from "lucide-react";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 const Navbar = () => {
   const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
   const links = ["Home", "Categories", "Deals", "About", "Contact"];
 
   return (
@@ -22,8 +24,11 @@ const Navbar = () => {
         </ul>
 
         <div className="flex items-center gap-4">
-          <button className="relative text-foreground" aria-label="Cart">
+          <button className="relative text-foreground" aria-label="Cart" onClick={() => navigate("/cart")}>
             <ShoppingCart className="h-5 w-5" />
+          </button>
+          <button className="relative text-foreground" aria-label="Profile" onClick={() => navigate("/customer/profile")}>
+            <User className="h-5 w-5" />
           </button>
           <button className="rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground transition-transform hover:scale-105 hidden sm:block">
             Sign In

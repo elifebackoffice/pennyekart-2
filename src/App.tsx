@@ -38,6 +38,7 @@ import CustomerSignup from "./pages/customer/Signup";
 import CustomerLogin from "./pages/customer/Login";
 import ProductDetail from "./pages/customer/ProductDetail";
 import Cart from "./pages/customer/Cart";
+import CustomerProfile from "./pages/customer/Profile";
 
 const queryClient = new QueryClient();
 
@@ -87,7 +88,7 @@ const App = () => {
               <Route path="/cart" element={<Cart />} />
               <Route path="/customer/signup" element={<CustomerSignup />} />
               <Route path="/customer/login" element={<CustomerLogin />} />
-              <Route path="/customer/login" element={<CustomerLogin />} />
+              <Route path="/customer/profile" element={<CustomerProfile />} />
 
               {/* Selling Partner */}
               <Route path="/selling-partner/signup" element={<SellingPartnerSignup />} />
