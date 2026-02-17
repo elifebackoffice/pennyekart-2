@@ -109,12 +109,12 @@ const Index = () => {
 
   return (
     <div className="min-h-screen pb-16 md:pb-0">
-      <header className="sticky top-0 z-40">
+      <header className="sticky top-0 z-50">
         <PlatformSelector selected={platform} onSelect={handlePlatformSelect} />
         <SearchBar />
       </header>
 
-      <main className="space-y-2">
+      <main className="relative z-0 space-y-2">
         <CategoryBar />
         <BannerCarousel />
         <GroceryCategories onCategoryClick={handleCategoryClick} selectedCategory={selectedCategory} />
