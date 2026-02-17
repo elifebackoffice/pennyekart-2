@@ -1,0 +1,272 @@
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { ArrowLeft, Package, Clock, CheckCircle, Truck, MapPin, User, Phone, Mail, ChevronRight, ShoppingBag } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+
+interface Order {
+  id: string;
+  items: any[];
+  total: number;
+  status: string;
+  created_at: string;
+  shipping_address: string | null;
+}
+
+const statusSteps = ["pending", "confirmed", "packed", "shipped", "delivered"];
+const statusIcons: Record<string, any> = {
+  pending: Clock,
+  confirmed: CheckCircle,
+  packed: Package,
+  shipped: Truck,
+  delivered: MapPin,
+};
+const statusLabels: Record<string, string> = {
+  pending: "Pending",
+  confirmed: "Confirmed",
+  packed: "Packed",
+  shipped: "Shipped",
+  delivered: "Delivered",
+};
+
+const Profile = () => {
+  const navigate = useNavigate();
+  const { user, profile, signOut } = useAuth();
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editMode, setEditMode] = useState(false);
+  const [fullName, setFullName] = useState("");
+  const [mobile, setMobile] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+
+  useEffect(() => {
+    if (!user) {
+      navigate("/customer/login");
+      return;
+    }
+    fetchOrders();
+  }, [user]);
+
+  useEffect(() => {
+    if (profile) {
+      setFullName(profile.full_name || "");
+      setMobile(profile.mobile_number || "");
+    }
+  }, [profile]);
+
+  const fetchOrders = async () => {
+    const { data, error } = await supabase
+      .from("orders")
+      .select("*")
+      .eq("user_id", user!.id)
+      .order("created_at", { ascending: false });
+    if (!error && data) setOrders(data as Order[]);
+    setLoading(false);
+  };
+
+  const activeOrders = orders.filter(o => !["delivered", "cancelled"].includes(o.status));
+  const pastOrders = orders.filter(o => ["delivered", "cancelled"].includes(o.status));
+
+  const handleSaveProfile = async () => {
+    if (!profile) return;
+    setSaving(true);
+    const { error } = await supabase
+      .from("profiles")
+      .update({ full_name: fullName, mobile_number: mobile })
+      .eq("user_id", user!.id);
+    if (error) toast.error("Failed to update profile");
+    else { toast.success("Profile updated"); setEditMode(false); }
+    setSaving(false);
+  };
+
+  const getStatusIndex = (status: string) => statusSteps.indexOf(status);
+
+  const OrderCard = ({ order, showTracking }: { order: Order; showTracking?: boolean }) => {
+    const items = Array.isArray(order.items) ? order.items : [];
+    const currentStep = getStatusIndex(order.status);
+
+    return (
+      <Card className="overflow-hidden">
+        <CardContent className="p-0">
+          <div className="flex items-center justify-between p-4 bg-muted/30">
+            <div>
+              <p className="text-xs text-muted-foreground">Order #{order.id.slice(0, 8)}</p>
+              <p className="text-xs text-muted-foreground">{new Date(order.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p>
+            </div>
+            <Badge variant={order.status === "delivered" ? "default" : order.status === "cancelled" ? "destructive" : "secondary"}>
+              {statusLabels[order.status] || order.status}
+            </Badge>
+          </div>
+
+          <div className="p-4 space-y-3">
+            {items.slice(0, 2).map((item: any, idx: number) => (
+              <div key={idx} className="flex items-center gap-3">
+                {item.image && <img src={item.image} alt={item.name} className="w-12 h-12 rounded-lg object-cover border" />}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{item.name}</p>
+                  <p className="text-xs text-muted-foreground">Qty: {item.quantity} × ₹{item.price}</p>
+                </div>
+              </div>
+            ))}
+            {items.length > 2 && <p className="text-xs text-muted-foreground">+{items.length - 2} more items</p>}
+          </div>
+
+          <Separator />
+
+          <div className="flex items-center justify-between p-4">
+            <p className="text-sm font-bold">₹{order.total.toFixed(2)}</p>
+            {showTracking && order.status !== "cancelled" && (
+              <Button size="sm" variant="outline" onClick={() => setSelectedOrder(order)}>
+                Track Order <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            )}
+          </div>
+
+          {/* Inline tracking for selected order */}
+          {selectedOrder?.id === order.id && order.status !== "cancelled" && (
+            <>
+              <Separator />
+              <div className="p-4">
+                <p className="text-sm font-semibold mb-4">Order Tracking</p>
+                <div className="space-y-0">
+                  {statusSteps.map((step, idx) => {
+                    const Icon = statusIcons[step];
+                    const isCompleted = idx <= currentStep;
+                    const isCurrent = idx === currentStep;
+                    return (
+                      <div key={step} className="flex items-start gap-3">
+                        <div className="flex flex-col items-center">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${isCompleted ? "bg-primary border-primary text-primary-foreground" : "border-muted-foreground/30 text-muted-foreground/30"}`}>
+                            <Icon className="h-4 w-4" />
+                          </div>
+                          {idx < statusSteps.length - 1 && (
+                            <div className={`w-0.5 h-6 ${idx < currentStep ? "bg-primary" : "bg-muted-foreground/20"}`} />
+                          )}
+                        </div>
+                        <div className="pt-1">
+                          <p className={`text-sm font-medium ${isCompleted ? "text-foreground" : "text-muted-foreground/40"}`}>
+                            {statusLabels[step]}
+                          </p>
+                          {isCurrent && <p className="text-xs text-primary">Current status</p>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <Button size="sm" variant="ghost" className="mt-2" onClick={() => setSelectedOrder(null)}>Close</Button>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
+
+  if (!user) return null;
+
+  return (
+    <div className="min-h-screen bg-background pb-20">
+      {/* Header */}
+      <div className="sticky top-0 z-40 bg-card border-b">
+        <div className="flex items-center gap-3 px-4 py-3">
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <h1 className="text-lg font-semibold">My Account</h1>
+        </div>
+      </div>
+
+      <div className="max-w-2xl mx-auto p-4 space-y-4">
+        {/* Profile Card */}
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
+                <User className="h-7 w-7 text-primary" />
+              </div>
+              <div className="flex-1">
+                <p className="font-semibold text-lg">{profile?.full_name || "Customer"}</p>
+                <p className="text-sm text-muted-foreground flex items-center gap-1"><Mail className="h-3 w-3" /> {user.email}</p>
+                {profile?.mobile_number && (
+                  <p className="text-sm text-muted-foreground flex items-center gap-1"><Phone className="h-3 w-3" /> {profile.mobile_number}</p>
+                )}
+              </div>
+              {!editMode && <Button size="sm" variant="outline" onClick={() => setEditMode(true)}>Edit</Button>}
+            </div>
+
+            {editMode && (
+              <div className="space-y-3 pt-2 border-t">
+                <div>
+                  <Label>Full Name</Label>
+                  <Input value={fullName} onChange={e => setFullName(e.target.value)} />
+                </div>
+                <div>
+                  <Label>Mobile Number</Label>
+                  <Input value={mobile} onChange={e => setMobile(e.target.value)} />
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={handleSaveProfile} disabled={saving}>{saving ? "Saving..." : "Save"}</Button>
+                  <Button size="sm" variant="outline" onClick={() => setEditMode(false)}>Cancel</Button>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Orders */}
+        <Tabs defaultValue="active" className="w-full">
+          <TabsList className="w-full">
+            <TabsTrigger value="active" className="flex-1 gap-1">
+              <Truck className="h-4 w-4" /> Active ({activeOrders.length})
+            </TabsTrigger>
+            <TabsTrigger value="history" className="flex-1 gap-1">
+              <ShoppingBag className="h-4 w-4" /> History ({pastOrders.length})
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="active" className="space-y-3 mt-3">
+            {loading ? (
+              <p className="text-center text-muted-foreground py-8">Loading...</p>
+            ) : activeOrders.length === 0 ? (
+              <Card><CardContent className="p-8 text-center text-muted-foreground">
+                <Package className="h-10 w-10 mx-auto mb-2 opacity-40" />
+                <p>No active orders</p>
+              </CardContent></Card>
+            ) : (
+              activeOrders.map(o => <OrderCard key={o.id} order={o} showTracking />)
+            )}
+          </TabsContent>
+
+          <TabsContent value="history" className="space-y-3 mt-3">
+            {loading ? (
+              <p className="text-center text-muted-foreground py-8">Loading...</p>
+            ) : pastOrders.length === 0 ? (
+              <Card><CardContent className="p-8 text-center text-muted-foreground">
+                <ShoppingBag className="h-10 w-10 mx-auto mb-2 opacity-40" />
+                <p>No past orders</p>
+              </CardContent></Card>
+            ) : (
+              pastOrders.map(o => <OrderCard key={o.id} order={o} />)
+            )}
+          </TabsContent>
+        </Tabs>
+
+        {/* Logout */}
+        <Button variant="destructive" className="w-full" onClick={async () => { await signOut(); navigate("/"); }}>
+          Logout
+        </Button>
+      </div>
+    </div>
+  );
+};
+
+export default Profile;
