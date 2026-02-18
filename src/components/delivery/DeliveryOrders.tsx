@@ -54,9 +54,27 @@ const DeliveryOrders = ({ orders, userId, onRefresh }: Props) => {
     }
     if (newStatus === "delivered") {
       await creditWallet(order);
+      await deductSellerStock(order);
     }
     toast({ title: `Order ${newStatus}` });
     onRefresh();
+  };
+
+  const deductSellerStock = async (order: Order) => {
+    if (!Array.isArray(order.items)) return;
+    for (const item of order.items) {
+      if (!item.id || !item.quantity) continue;
+      // Check if this item is a seller product
+      const { data: sellerProduct } = await supabase
+        .from("seller_products")
+        .select("id, stock")
+        .eq("id", item.id)
+        .maybeSingle();
+      if (sellerProduct) {
+        const newStock = Math.max(0, (sellerProduct.stock ?? 0) - item.quantity);
+        await supabase.from("seller_products").update({ stock: newStock }).eq("id", sellerProduct.id);
+      }
+    }
   };
 
   const creditWallet = async (order: Order) => {
