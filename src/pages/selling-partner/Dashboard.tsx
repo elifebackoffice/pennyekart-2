@@ -91,9 +91,10 @@ const SellingPartnerDashboard = () => {
 
   // Analytics state
   const [analytics, setAnalytics] = useState<{
-    itemStats: { name: string; sold: number; revenue: number; cost: number; margin: number }[];
+    itemStats: { id: string; name: string; sold: number; revenue: number; purchaseRate: number; discount: number; totalOrders: number }[];
     panchayathStats: { name: string; orders: number; revenue: number }[];
   }>({ itemStats: [], panchayathStats: [] });
+  const [totalOrderCount, setTotalOrderCount] = useState(0);
 
   const handleAddStock = async () => {
     if (!addStockProduct || !user) return;
@@ -153,30 +154,36 @@ const SellingPartnerDashboard = () => {
   };
 
   const fetchAnalytics = async (myProducts: SellerProduct[], allOrders: Order[]) => {
-    if (!myProducts.length || !allOrders.length) return;
+    if (!myProducts.length) return;
 
-    // Build item-wise sold stats from orders
-    const itemMap: Record<string, { name: string; sold: number; revenue: number; cost: number }> = {};
+    const deliveredOrds = allOrders.filter(o => o.status === "delivered");
+    setTotalOrderCount(deliveredOrds.length);
+
+    // Build item-wise sold stats from delivered orders
+    const itemMap: Record<string, { id: string; name: string; sold: number; revenue: number; purchaseRate: number; discount: number; orderCount: number }> = {};
     myProducts.forEach(p => {
-      itemMap[p.id] = { name: p.name, sold: 0, revenue: 0, cost: p.purchase_rate };
+      itemMap[p.id] = { id: p.id, name: p.name, sold: 0, revenue: 0, purchaseRate: p.purchase_rate, discount: p.discount_rate, orderCount: 0 };
     });
 
-    allOrders.forEach(order => {
+    deliveredOrds.forEach(order => {
       if (!Array.isArray(order.items)) return;
-      order.items.forEach((item: any) => {
-        if (itemMap[item.id]) {
-          itemMap[item.id].sold += item.quantity || 1;
-          itemMap[item.id].revenue += (item.price || 0) * (item.quantity || 1);
-        }
+      const myItemsInOrder = order.items.filter((item: any) => itemMap[item.id]);
+      myItemsInOrder.forEach((item: any) => {
+        itemMap[item.id].sold += item.quantity || 1;
+        // revenue = purchase_rate * qty (cost-based revenue as requested)
+        itemMap[item.id].revenue += (itemMap[item.id].purchaseRate) * (item.quantity || 1);
+        itemMap[item.id].orderCount++;
       });
     });
 
     const itemStats = Object.values(itemMap).map(i => ({
+      id: i.id,
       name: i.name,
       sold: i.sold,
       revenue: i.revenue,
-      cost: i.cost * i.sold,
-      margin: i.revenue - i.cost * i.sold,
+      purchaseRate: i.purchaseRate,
+      discount: i.discount,
+      totalOrders: i.orderCount,
     })).sort((a, b) => b.sold - a.sold);
 
     // Panchayath analytics: fetch profiles of order users
@@ -300,7 +307,12 @@ const SellingPartnerDashboard = () => {
   };
 
   const deliveredOrders = orders.filter(o => o.status === "delivered");
-  const totalRevenue = deliveredOrders.reduce((s, o) => s + (o.total || 0), 0);
+  // Revenue = sum of (purchase_rate × qty) for all items sold, from analytics
+  const totalRevenue = analytics.itemStats.reduce((s, i) => s + i.revenue, 0);
+  // Wallet: total credits minus total settlements
+  const totalCredits = transactions.filter(t => t.type !== "settlement" && !t.description?.toLowerCase().includes("settl")).reduce((s, t) => s + Math.abs(t.amount), 0);
+  const totalSettled = transactions.filter(t => t.type === "settlement" || t.description?.toLowerCase().includes("settl")).reduce((s, t) => s + Math.abs(t.amount), 0);
+  const walletRevenue = totalCredits - totalSettled;
 
   return (
     <div className="min-h-screen bg-background">
@@ -557,16 +569,16 @@ const SellingPartnerDashboard = () => {
                   <CardTitle className="text-sm text-muted-foreground">Total Revenue</CardTitle>
                   <TrendingUp className="h-4 w-4 text-primary" />
                 </CardHeader>
-                <CardContent><p className="text-2xl font-bold">₹{totalRevenue.toFixed(2)}</p><p className="text-xs text-muted-foreground">From {deliveredOrders.length} delivered orders</p></CardContent>
+                <CardContent><p className="text-2xl font-bold">₹{totalRevenue.toFixed(2)}</p><p className="text-xs text-muted-foreground">From {deliveredOrders.length} delivered orders (purchase rate basis)</p></CardContent>
               </Card>
               <Card>
                 <CardHeader className="pb-2 flex flex-row items-center justify-between">
-                  <CardTitle className="text-sm text-muted-foreground">Total Margin</CardTitle>
+                  <CardTitle className="text-sm text-muted-foreground">Items Sold</CardTitle>
                   <BarChart3 className="h-4 w-4 text-primary" />
                 </CardHeader>
                 <CardContent>
-                  <p className="text-2xl font-bold">₹{analytics.itemStats.reduce((s, i) => s + i.margin, 0).toFixed(2)}</p>
-                  <p className="text-xs text-muted-foreground">Revenue minus purchase cost</p>
+                  <p className="text-2xl font-bold">{analytics.itemStats.reduce((s, i) => s + i.sold, 0)}</p>
+                  <p className="text-xs text-muted-foreground">Total units across all products</p>
                 </CardContent>
               </Card>
             </div>
@@ -579,26 +591,25 @@ const SellingPartnerDashboard = () => {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Product</TableHead>
-                      <TableHead>Current Stock</TableHead>
+                      <TableHead>Stock</TableHead>
                       <TableHead>Units Sold</TableHead>
-                      <TableHead>Revenue</TableHead>
-                      <TableHead>Cost</TableHead>
-                      <TableHead>Margin</TableHead>
+                      <TableHead>Purchase Rate</TableHead>
+                      <TableHead>Discount</TableHead>
+                      <TableHead>Order %</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {products.map(p => {
-                      const stat = analytics.itemStats.find(s => s.name === p.name) || { sold: 0, revenue: 0, cost: 0, margin: 0 };
+                      const stat = analytics.itemStats.find(s => s.id === p.id) || { sold: 0, revenue: 0, purchaseRate: p.purchase_rate, discount: p.discount_rate, totalOrders: 0 };
+                      const orderPct = totalOrderCount > 0 ? ((stat.totalOrders / totalOrderCount) * 100).toFixed(1) : "0.0";
                       return (
                         <TableRow key={p.id}>
                           <TableCell className="font-medium">{p.name}</TableCell>
                           <TableCell><Badge variant={p.stock > 0 ? "default" : "destructive"}>{p.stock}</Badge></TableCell>
                           <TableCell>{stat.sold}</TableCell>
-                          <TableCell>₹{stat.revenue.toFixed(2)}</TableCell>
-                          <TableCell>₹{stat.cost.toFixed(2)}</TableCell>
-                          <TableCell className={stat.margin >= 0 ? "text-green-600 font-semibold" : "text-destructive font-semibold"}>
-                            ₹{stat.margin.toFixed(2)}
-                          </TableCell>
+                          <TableCell>₹{stat.purchaseRate.toFixed(2)}</TableCell>
+                          <TableCell>₹{stat.discount.toFixed(2)}</TableCell>
+                          <TableCell className="font-semibold">{orderPct}%</TableCell>
                         </TableRow>
                       );
                     })}
@@ -634,12 +645,26 @@ const SellingPartnerDashboard = () => {
 
           {/* WALLET TAB */}
           <TabsContent value="wallet" className="space-y-4">
-            <Card>
-              <CardContent className="pt-6 text-center">
-                <p className="text-sm text-muted-foreground">Available Balance</p>
-                <p className="text-4xl font-bold mt-1">₹{walletBalance.toFixed(2)}</p>
-              </CardContent>
-            </Card>
+            <div className="grid grid-cols-3 gap-3">
+              <Card>
+                <CardContent className="pt-5 text-center">
+                  <p className="text-xs text-muted-foreground">Total Revenue</p>
+                  <p className="text-xl font-bold mt-1">₹{totalCredits.toFixed(2)}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-5 text-center">
+                  <p className="text-xs text-muted-foreground">Settled</p>
+                  <p className="text-xl font-bold mt-1 text-destructive">-₹{totalSettled.toFixed(2)}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-5 text-center">
+                  <p className="text-xs text-muted-foreground">Net Balance</p>
+                  <p className="text-xl font-bold mt-1">₹{walletRevenue.toFixed(2)}</p>
+                </CardContent>
+              </Card>
+            </div>
 
             {transactions.length === 0 ? (
               <p className="text-muted-foreground text-center py-4">No transactions yet</p>
