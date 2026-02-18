@@ -18,7 +18,7 @@ interface Service {
   is_active: boolean; sort_order: number;
 }
 
-const emptyService = { name: "", description: "", icon: "", image_url: "", logo_url: "", website_url: "", price: 0, category: "", is_active: true, sort_order: 0 };
+const emptyService = { name: "", description: "", icon: "", image_url: "", logo_url: "", website_url: "", is_active: true, sort_order: 0 };
 
 const ServicesPage = () => {
   const [services, setServices] = useState<Service[]>([]);
@@ -52,7 +52,7 @@ const ServicesPage = () => {
   };
 
   const openEdit = (s: Service) => {
-    setForm({ name: s.name, description: s.description ?? "", icon: s.icon ?? "", image_url: s.image_url ?? "", logo_url: s.logo_url ?? "", website_url: s.website_url ?? "", price: s.price, category: s.category ?? "", is_active: s.is_active, sort_order: s.sort_order });
+    setForm({ name: s.name, description: s.description ?? "", icon: s.icon ?? "", image_url: s.image_url ?? "", logo_url: s.logo_url ?? "", website_url: s.website_url ?? "", is_active: s.is_active, sort_order: s.sort_order });
     setEditId(s.id); setOpen(true);
   };
 
@@ -70,10 +70,6 @@ const ServicesPage = () => {
               <div className="space-y-3">
                 <div><Label>Name</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
                 <div><Label>Description</Label><Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div><Label>Price</Label><Input type="number" value={form.price} onChange={(e) => setForm({ ...form, price: +e.target.value })} /></div>
-                  <div><Label>Category</Label><Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="e.g. Cleaning, Plumbing" /></div>
-                </div>
                 <div><Label>Website URL (subsidiary site)</Label><Input value={form.website_url} onChange={(e) => setForm({ ...form, website_url: e.target.value })} placeholder="https://pennycarbs.com" /></div>
                 <div><Label>Logo URL</Label><Input value={form.logo_url} onChange={(e) => setForm({ ...form, logo_url: e.target.value })} placeholder="Logo image URL" /></div>
                 <div><Label>Icon Name (Lucide)</Label><Input value={form.icon} onChange={(e) => setForm({ ...form, icon: e.target.value })} placeholder="e.g. Wrench, Paintbrush" /></div>
@@ -91,8 +87,7 @@ const ServicesPage = () => {
           <TableHeader>
             <TableRow>
               <TableHead>Name</TableHead>
-              <TableHead>Category</TableHead>
-              <TableHead>Price</TableHead>
+              <TableHead>Website</TableHead>
               <TableHead>Active</TableHead>
               <TableHead className="w-24">Actions</TableHead>
             </TableRow>
@@ -101,8 +96,7 @@ const ServicesPage = () => {
             {services.map((s) => (
               <TableRow key={s.id}>
                 <TableCell className="font-medium">{s.name}</TableCell>
-                <TableCell>{s.category}</TableCell>
-                <TableCell>₹{s.price}</TableCell>
+                <TableCell className="text-muted-foreground truncate max-w-[200px]">{s.website_url}</TableCell>
                 <TableCell>{s.is_active ? "✓" : "✗"}</TableCell>
                 <TableCell>
                   <div className="flex gap-1">
@@ -113,7 +107,7 @@ const ServicesPage = () => {
               </TableRow>
             ))}
             {services.length === 0 && (
-              <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">No services yet</TableCell></TableRow>
+              <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">No services yet</TableCell></TableRow>
             )}
           </TableBody>
         </Table>
