@@ -57,28 +57,82 @@ const Cart = () => {
   const handleConfirmOrder = async () => {
     setPlacingOrder(true);
     try {
-      const orderItems = items.map(i => ({
-        id: i.id,
-        name: i.name,
-        price: i.price,
-        mrp: i.mrp,
-        quantity: i.quantity,
-        image: i.image,
-      }));
+      // Split items by source: micro godown (products) vs area godown (seller_products)
+      const microItems = items.filter(i => i.source !== "seller_product");
+      const sellerItemsBySeller = new Map<string, typeof items>();
 
-      const { error } = await supabase.from("orders").insert({
-        user_id: user!.id,
-        items: orderItems,
-        total: finalAmount,
-        status: "pending",
-        shipping_address: paymentMethod === "cod" ? "Cash on Delivery" : paymentMethod,
-      });
+      items
+        .filter(i => i.source === "seller_product")
+        .forEach(i => {
+          const sellerId = i.seller_id || "unknown";
+          if (!sellerItemsBySeller.has(sellerId)) {
+            sellerItemsBySeller.set(sellerId, []);
+          }
+          sellerItemsBySeller.get(sellerId)!.push(i);
+        });
 
-      if (error) throw error;
+      const mapOrderItems = (orderItems: typeof items) =>
+        orderItems.map(i => ({
+          id: i.id,
+          name: i.name,
+          price: i.price,
+          mrp: i.mrp,
+          quantity: i.quantity,
+          image: i.image,
+          source: i.source || "product",
+        }));
+
+      const calcTotal = (orderItems: typeof items) => {
+        const itemsTotal = orderItems.reduce((s, i) => s + i.price * i.quantity, 0);
+        // Distribute platform fee and discounts proportionally
+        const proportion = itemsTotal / totalPrice;
+        const proportionalCoupon = couponDiscount * proportion;
+        const proportionalWallet = walletDeduction * proportion;
+        // Platform fee only on the first order (micro), or split
+        return Math.max(0, itemsTotal - proportionalCoupon - proportionalWallet);
+      };
+
+      const ordersToInsert: any[] = [];
+
+      // Micro godown order (regular flow)
+      if (microItems.length > 0) {
+        const microTotal = calcTotal(microItems) + (sellerItemsBySeller.size > 0 ? platformFee / 2 : platformFee);
+        ordersToInsert.push({
+          user_id: user!.id,
+          items: mapOrderItems(microItems),
+          total: microTotal,
+          status: "pending",
+          shipping_address: paymentMethod === "cod" ? "Cash on Delivery" : paymentMethod,
+        });
+      }
+
+      // Area godown orders (one per seller, starts with seller_confirmation_pending)
+      for (const [sellerId, sellerItems] of sellerItemsBySeller) {
+        const sellerTotal = calcTotal(sellerItems) + (microItems.length > 0 ? platformFee / 2 : platformFee) / sellerItemsBySeller.size;
+        ordersToInsert.push({
+          user_id: user!.id,
+          items: mapOrderItems(sellerItems),
+          total: sellerTotal,
+          status: "seller_confirmation_pending",
+          shipping_address: paymentMethod === "cod" ? "Cash on Delivery" : paymentMethod,
+          seller_id: sellerId === "unknown" ? null : sellerId,
+        });
+      }
+
+      // Insert all orders
+      for (const order of ordersToInsert) {
+        const { error } = await supabase.from("orders").insert(order);
+        if (error) throw error;
+      }
 
       clearCart();
       setShowPayment(false);
-      toast.success("Order placed successfully!");
+      const orderCount = ordersToInsert.length;
+      toast.success(
+        orderCount > 1
+          ? `${orderCount} orders placed successfully! Micro godown items ship directly. Seller items await seller confirmation.`
+          : "Order placed successfully!"
+      );
       navigate("/");
     } catch (err: any) {
       toast.error(err.message || "Failed to place order");

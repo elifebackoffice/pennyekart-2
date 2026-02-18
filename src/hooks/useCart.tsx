@@ -7,6 +7,8 @@ export interface CartItem {
   mrp: number;
   image: string;
   quantity: number;
+  source?: "product" | "seller_product";
+  seller_id?: string;
 }
 
 interface CartContextType {

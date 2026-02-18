@@ -17,9 +17,11 @@ interface Order {
   created_at: string;
   items: any;
   user_id: string | null;
+  seller_id?: string | null;
 }
 
 const STATUS_FLOW = ["pending", "accepted", "pickup", "shipped", "delivered"];
+const SELLER_STATUS_FLOW = ["seller_confirmation_pending", "seller_accepted", "accepted", "pickup", "shipped", "delivered"];
 
 interface Props {
   orders: Order[];
@@ -40,10 +42,13 @@ const DeliveryOrders = ({ orders, userId, onRefresh }: Props) => {
     return true;
   });
 
-  const getNextStatus = (current: string) => {
-    const idx = STATUS_FLOW.indexOf(current);
-    if (idx === -1 || idx >= STATUS_FLOW.length - 1) return null;
-    return STATUS_FLOW[idx + 1];
+  const getNextStatus = (current: string, order: Order) => {
+    // Determine if this is a seller order based on seller_id or status
+    const isSeller = order.seller_id || SELLER_STATUS_FLOW.includes(current);
+    const flow = isSeller ? SELLER_STATUS_FLOW : STATUS_FLOW;
+    const idx = flow.indexOf(current);
+    if (idx === -1 || idx >= flow.length - 1) return null;
+    return flow[idx + 1];
   };
 
   const updateOrderStatus = async (order: Order, newStatus: string) => {
@@ -141,21 +146,30 @@ const DeliveryOrders = ({ orders, userId, onRefresh }: Props) => {
           {items.length === 0 ? (
             <TableRow><TableCell colSpan={showAction ? 6 : 5} className="text-center text-muted-foreground">No orders</TableCell></TableRow>
           ) : items.map((o) => {
-            const next = getNextStatus(o.status);
             return (
               <TableRow key={o.id}>
                 <TableCell className="font-mono text-xs">{o.id.slice(0, 8)}…</TableCell>
                 <TableCell>₹{o.total}</TableCell>
                 <TableCell className="text-sm max-w-[200px] truncate">{o.shipping_address ?? "—"}</TableCell>
-                <TableCell><Badge variant={statusColor(o.status) as any}>{o.status}</Badge></TableCell>
+                <TableCell><Badge variant={statusColor(o.status) as any}>{o.status.replace(/_/g, " ")}</Badge></TableCell>
                 <TableCell className="text-xs text-muted-foreground">{new Date(o.created_at).toLocaleDateString()}</TableCell>
                 {showAction && (
                   <TableCell>
-                    {next ? (
-                      <Button size="sm" onClick={() => updateOrderStatus(o, next)}>
-                        {next === "accepted" ? "Accept" : next === "pickup" ? "Pickup" : next === "shipped" ? "Ship" : next === "delivered" ? "Delivered" : next}
-                      </Button>
-                    ) : <span className="text-xs text-muted-foreground">Done</span>}
+                    {(() => {
+                      const next = getNextStatus(o.status, o);
+                      // Delivery staff shouldn't advance seller_confirmation_pending orders
+                      if (o.status === "seller_confirmation_pending") {
+                        return <span className="text-xs text-muted-foreground">Awaiting seller</span>;
+                      }
+                      if (next) {
+                        return (
+                          <Button size="sm" onClick={() => updateOrderStatus(o, next)}>
+                            {next === "accepted" ? "Accept" : next === "pickup" ? "Pickup" : next === "shipped" ? "Ship" : next === "delivered" ? "Delivered" : next.replace(/_/g, " ")}
+                          </Button>
+                        );
+                      }
+                      return <span className="text-xs text-muted-foreground">Done</span>;
+                    })()}
                   </TableCell>
                 )}
               </TableRow>

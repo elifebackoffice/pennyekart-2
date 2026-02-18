@@ -42,6 +42,9 @@ const ProductDetail = () => {
   const { profile } = useAuth();
   const [availableStock, setAvailableStock] = useState<number | null>(null);
 
+  const [productSource, setProductSource] = useState<"product" | "seller_product">("product");
+  const [productSellerId, setProductSellerId] = useState<string | undefined>();
+
   const handleAddToCart = () => {
     if (!product) return;
     addItem({
@@ -50,6 +53,8 @@ const ProductDetail = () => {
       price: product.price,
       mrp: product.mrp,
       image: product.image_url || "",
+      source: productSource,
+      seller_id: productSellerId,
     });
     toast({ title: "Added to cart", description: `${product.name} added to your cart.` });
   };
@@ -62,6 +67,8 @@ const ProductDetail = () => {
       price: product.price,
       mrp: product.mrp,
       image: product.image_url || "",
+      source: productSource,
+      seller_id: productSellerId,
     });
     navigate("/cart");
   };
@@ -130,17 +137,21 @@ const ProductDetail = () => {
 
       if (data) {
         productData = data as ProductData;
+        setProductSource("product");
+        setProductSellerId(undefined);
       } else {
         // Fallback: check seller_products table
         const { data: sellerData } = await supabase
           .from("seller_products")
-          .select("id, name, price, mrp, discount_rate, description, image_url, image_url_2, image_url_3, video_url, category, stock")
+          .select("id, name, price, mrp, discount_rate, description, image_url, image_url_2, image_url_3, video_url, category, stock, seller_id")
           .eq("id", id)
           .eq("is_active", true)
           .eq("is_approved", true)
           .maybeSingle();
         if (sellerData) {
           productData = sellerData as ProductData;
+          setProductSource("seller_product");
+          setProductSellerId(sellerData.seller_id);
         }
       }
 

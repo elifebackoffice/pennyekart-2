@@ -61,8 +61,10 @@ interface WalletTxn {
 }
 
 const STATUS_LABELS: Record<string, string> = {
+  seller_confirmation_pending: "Awaiting Your Confirmation",
+  seller_accepted: "Confirmed - Awaiting Delivery",
   pending: "Order Placed", packed: "Packed", pickup: "Picked Up",
-  shipped: "Shipped", delivery_pending: "Delivery Pending", delivered: "Delivered",
+  accepted: "Accepted", shipped: "Shipped", delivery_pending: "Delivery Pending", delivered: "Delivered",
 };
 
 const emptyForm = {
@@ -542,6 +544,7 @@ const SellingPartnerDashboard = () => {
                       <TableHead>Status</TableHead>
                       <TableHead>Total</TableHead>
                       <TableHead>Date</TableHead>
+                      <TableHead>Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -554,12 +557,30 @@ const SellingPartnerDashboard = () => {
                             {myItems.length > 0 ? myItems.map((i: any) => `${i.name} ×${i.quantity || 1}`).join(", ") : (Array.isArray(o.items) ? o.items.map((i: any) => `${i.name} ×${i.quantity || 1}`).join(", ") : "-")}
                           </TableCell>
                           <TableCell>
-                            <Badge variant={o.status === "delivered" ? "default" : "secondary"}>
-                              {STATUS_LABELS[o.status] || o.status}
+                            <Badge variant={o.status === "delivered" ? "default" : o.status === "seller_confirmation_pending" ? "destructive" : "secondary"}>
+                              {STATUS_LABELS[o.status] || o.status.replace(/_/g, " ")}
                             </Badge>
                           </TableCell>
                           <TableCell>₹{o.total}</TableCell>
                           <TableCell className="text-sm text-muted-foreground">{new Date(o.created_at).toLocaleDateString()}</TableCell>
+                          <TableCell>
+                            {o.status === "seller_confirmation_pending" && (
+                              <Button size="sm" onClick={async () => {
+                                const { error } = await supabase.from("orders").update({ status: "seller_accepted" }).eq("id", o.id);
+                                if (error) {
+                                  toast({ title: "Error", description: error.message, variant: "destructive" });
+                                } else {
+                                  toast({ title: "Order accepted!" });
+                                  fetchOrders(products);
+                                }
+                              }}>
+                                Accept Order
+                              </Button>
+                            )}
+                            {o.status !== "seller_confirmation_pending" && (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
                         </TableRow>
                       );
                     })}
