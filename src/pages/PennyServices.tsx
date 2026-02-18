@@ -1,12 +1,18 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Wrench, ArrowLeft } from "lucide-react";
+import { Wrench, ArrowLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 
 interface Service {
-  id: string; name: string; description: string | null; icon: string | null;
-  image_url: string | null; price: number; category: string | null;
+  id: string;
+  name: string;
+  description: string | null;
+  icon: string | null;
+  image_url: string | null;
+  logo_url: string | null;
+  website_url: string | null;
+  category: string | null;
 }
 
 const PennyServices = () => {
@@ -16,7 +22,11 @@ const PennyServices = () => {
 
   useEffect(() => {
     const fetch = async () => {
-      const { data } = await supabase.from("services").select("*").eq("is_active", true).order("sort_order");
+      const { data } = await supabase
+        .from("services")
+        .select("id, name, description, icon, image_url, logo_url, website_url, category")
+        .eq("is_active", true)
+        .order("sort_order");
       setServices((data as Service[]) ?? []);
       setLoading(false);
     };
@@ -51,7 +61,7 @@ const PennyServices = () => {
           <div className="flex flex-col items-center gap-3 py-16">
             <Wrench className="h-12 w-12 text-muted-foreground" />
             <p className="text-lg font-medium text-muted-foreground">Services coming soon!</p>
-            <p className="text-sm text-muted-foreground">We're adding home services. Stay tuned.</p>
+            <p className="text-sm text-muted-foreground">We're adding partner services. Stay tuned.</p>
           </div>
         ) : (
           <div className="space-y-8">
@@ -60,23 +70,30 @@ const PennyServices = () => {
                 <h2 className="mb-4 font-heading text-xl font-bold text-foreground">{category}</h2>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {items.map((s) => (
-                    <div key={s.id} className="group flex gap-4 rounded-xl border border-border bg-card p-4 transition-all hover:shadow-md">
-                      {s.image_url ? (
-                        <img src={s.image_url} alt={s.name} className="h-20 w-20 shrink-0 rounded-lg object-cover" />
+                    <button
+                      key={s.id}
+                      onClick={() => navigate(`/services/${s.id}`)}
+                      className="group flex items-center gap-4 rounded-xl border border-border bg-card p-4 text-left transition-all hover:shadow-md hover:border-primary/30"
+                    >
+                      {s.logo_url || s.image_url ? (
+                        <img
+                          src={s.logo_url || s.image_url!}
+                          alt={s.name}
+                          className="h-16 w-16 shrink-0 rounded-lg object-contain bg-muted p-1"
+                        />
                       ) : (
-                        <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                          <Wrench className="h-8 w-8 text-primary" />
+                        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                          <Wrench className="h-7 w-7 text-primary" />
                         </div>
                       )}
-                      <div className="flex flex-1 flex-col">
+                      <div className="flex-1 min-w-0">
                         <h3 className="font-semibold text-foreground">{s.name}</h3>
-                        {s.description && <p className="mt-1 text-sm text-muted-foreground line-clamp-2">{s.description}</p>}
-                        <div className="mt-auto flex items-center justify-between pt-2">
-                          <span className="text-lg font-bold text-foreground">₹{s.price}</span>
-                          <Button size="sm" variant="outline">Book Now</Button>
-                        </div>
+                        {s.description && (
+                          <p className="mt-1 text-sm text-muted-foreground line-clamp-2">{s.description}</p>
+                        )}
                       </div>
-                    </div>
+                      <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground group-hover:text-primary transition-colors" />
+                    </button>
                   ))}
                 </div>
               </section>

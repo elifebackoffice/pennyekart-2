@@ -952,10 +952,12 @@ export type Database = {
           id: string
           image_url: string | null
           is_active: boolean
+          logo_url: string | null
           name: string
           price: number
           sort_order: number
           updated_at: string
+          website_url: string | null
         }
         Insert: {
           category?: string | null
@@ -965,10 +967,12 @@ export type Database = {
           id?: string
           image_url?: string | null
           is_active?: boolean
+          logo_url?: string | null
           name: string
           price?: number
           sort_order?: number
           updated_at?: string
+          website_url?: string | null
         }
         Update: {
           category?: string | null
@@ -978,10 +982,12 @@ export type Database = {
           id?: string
           image_url?: string | null
           is_active?: boolean
+          logo_url?: string | null
           name?: string
           price?: number
           sort_order?: number
           updated_at?: string
+          website_url?: string | null
         }
         Relationships: []
       }

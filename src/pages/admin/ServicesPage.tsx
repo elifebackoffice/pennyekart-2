@@ -13,11 +13,12 @@ import { Plus, Pencil, Trash2 } from "lucide-react";
 
 interface Service {
   id: string; name: string; description: string | null; icon: string | null;
-  image_url: string | null; price: number; category: string | null;
+  image_url: string | null; logo_url: string | null; website_url: string | null;
+  price: number; category: string | null;
   is_active: boolean; sort_order: number;
 }
 
-const emptyService = { name: "", description: "", icon: "", image_url: "", price: 0, category: "", is_active: true, sort_order: 0 };
+const emptyService = { name: "", description: "", icon: "", image_url: "", logo_url: "", website_url: "", price: 0, category: "", is_active: true, sort_order: 0 };
 
 const ServicesPage = () => {
   const [services, setServices] = useState<Service[]>([]);
@@ -51,7 +52,7 @@ const ServicesPage = () => {
   };
 
   const openEdit = (s: Service) => {
-    setForm({ name: s.name, description: s.description ?? "", icon: s.icon ?? "", image_url: s.image_url ?? "", price: s.price, category: s.category ?? "", is_active: s.is_active, sort_order: s.sort_order });
+    setForm({ name: s.name, description: s.description ?? "", icon: s.icon ?? "", image_url: s.image_url ?? "", logo_url: s.logo_url ?? "", website_url: s.website_url ?? "", price: s.price, category: s.category ?? "", is_active: s.is_active, sort_order: s.sort_order });
     setEditId(s.id); setOpen(true);
   };
 
@@ -73,6 +74,8 @@ const ServicesPage = () => {
                   <div><Label>Price</Label><Input type="number" value={form.price} onChange={(e) => setForm({ ...form, price: +e.target.value })} /></div>
                   <div><Label>Category</Label><Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="e.g. Cleaning, Plumbing" /></div>
                 </div>
+                <div><Label>Website URL (subsidiary site)</Label><Input value={form.website_url} onChange={(e) => setForm({ ...form, website_url: e.target.value })} placeholder="https://pennycarbs.com" /></div>
+                <div><Label>Logo URL</Label><Input value={form.logo_url} onChange={(e) => setForm({ ...form, logo_url: e.target.value })} placeholder="Logo image URL" /></div>
                 <div><Label>Icon Name (Lucide)</Label><Input value={form.icon} onChange={(e) => setForm({ ...form, icon: e.target.value })} placeholder="e.g. Wrench, Paintbrush" /></div>
                 <div><Label>Image URL</Label><Input value={form.image_url} onChange={(e) => setForm({ ...form, image_url: e.target.value })} /></div>
                 <div><Label>Sort Order</Label><Input type="number" value={form.sort_order} onChange={(e) => setForm({ ...form, sort_order: +e.target.value })} /></div>
