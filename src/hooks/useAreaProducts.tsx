@@ -13,6 +13,7 @@ export interface AreaProduct {
   category: string | null;
   section: string | null;
   stock: number;
+  coming_soon?: boolean;
 }
 
 export const useAreaProducts = () => {
@@ -66,7 +67,7 @@ export const useAreaProducts = () => {
         const productIds = [...new Set(stockData.map(s => s.product_id))];
         const { data: productData } = await supabase
           .from("products")
-          .select("id, name, price, mrp, discount_rate, image_url, description, category, section, stock")
+          .select("id, name, price, mrp, discount_rate, image_url, description, category, section, stock, coming_soon")
           .in("id", productIds)
           .eq("is_active", true);
         if (productData) allProducts.push(...(productData as AreaProduct[]));
@@ -75,7 +76,7 @@ export const useAreaProducts = () => {
       // Also fetch approved seller products assigned to these godowns
       const { data: sellerProducts } = await supabase
         .from("seller_products")
-        .select("id, name, price, mrp, discount_rate, image_url, description, category, stock")
+        .select("id, name, price, mrp, discount_rate, image_url, description, category, stock, coming_soon")
         .in("area_godown_id", Array.from(godownIds))
         .eq("is_active", true)
         .eq("is_approved", true)

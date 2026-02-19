@@ -9,6 +9,7 @@ export interface CartItem {
   quantity: number;
   source?: "product" | "seller_product";
   seller_id?: string;
+  coming_soon?: boolean;
 }
 
 interface CartContextType {

@@ -10,6 +10,7 @@ export interface SectionProduct {
   image_url: string | null;
   category: string | null;
   section: string | null;
+  coming_soon?: boolean;
 }
 
 const sectionLabels: Record<string, string> = {
@@ -28,7 +29,7 @@ export const useSectionProducts = () => {
     const fetch = async () => {
       const { data } = await supabase
         .from("products")
-        .select("id, name, price, mrp, discount_rate, image_url, category, section")
+        .select("id, name, price, mrp, discount_rate, image_url, category, section, coming_soon")
         .eq("is_active", true)
         .not("section", "is", null)
         .neq("section", "");

@@ -1,4 +1,4 @@
-import { Star, TrendingUp, Sparkles, Wallet, Megaphone } from "lucide-react";
+import { Star, TrendingUp, Sparkles, Wallet, Megaphone, Clock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 export interface Product {
@@ -8,6 +8,7 @@ export interface Product {
   originalPrice?: number;
   rating: number;
   image: string;
+  coming_soon?: boolean;
 }
 
 interface ProductRowProps {
@@ -49,8 +50,8 @@ const ProductRow = ({ title, products, linkPrefix = "/product/", sectionKey }: P
           {products.map((p, i) => (
             <div
               key={p.id || i}
-              onClick={() => p.id && navigate(`${linkPrefix}${p.id}`)}
-              className="group flex w-36 shrink-0 cursor-pointer flex-col overflow-hidden rounded-xl border border-border bg-background transition-all hover:shadow-lg md:w-44"
+              onClick={() => p.id && !p.coming_soon && navigate(`${linkPrefix}${p.id}`)}
+              className={`group flex w-36 shrink-0 flex-col overflow-hidden rounded-xl border border-border bg-background transition-all hover:shadow-lg md:w-44 ${p.coming_soon ? "cursor-not-allowed opacity-80" : "cursor-pointer"}`}
             >
               <div className="relative aspect-square overflow-hidden bg-muted">
                 <img
@@ -58,24 +59,35 @@ const ProductRow = ({ title, products, linkPrefix = "/product/", sectionKey }: P
                   alt={p.name}
                   className="h-full w-full object-cover transition-transform group-hover:scale-105"
                 />
-                {p.originalPrice && (
+                {p.coming_soon ? (
+                  <span className="absolute left-0 right-0 top-0 flex items-center justify-center gap-1 bg-foreground/70 py-1 text-[10px] font-bold text-background">
+                    <Clock className="h-3 w-3" /> Coming Soon
+                  </span>
+                ) : p.originalPrice ? (
                   <span className="absolute left-1.5 top-1.5 rounded-md bg-destructive px-1.5 py-0.5 text-[10px] font-bold text-destructive-foreground">
                     {Math.round(((p.originalPrice - p.price) / p.originalPrice) * 100)}% OFF
                   </span>
-                )}
+                ) : null}
               </div>
               <div className="flex flex-1 flex-col gap-1 p-2.5">
                 <span className="line-clamp-2 text-xs font-medium text-foreground">{p.name}</span>
-                <div className="flex items-center gap-1">
-                  <Star className="h-3 w-3 fill-primary text-primary" />
-                  <span className="text-[11px] text-muted-foreground">{p.rating}</span>
-                </div>
-                <div className="mt-auto flex items-baseline gap-1.5">
-                  <span className="text-sm font-bold text-foreground">₹{p.price}</span>
-                  {p.originalPrice && (
-                    <span className="text-[11px] text-muted-foreground line-through">₹{p.originalPrice}</span>
-                  )}
-                </div>
+                {!p.coming_soon && (
+                  <>
+                    <div className="flex items-center gap-1">
+                      <Star className="h-3 w-3 fill-primary text-primary" />
+                      <span className="text-[11px] text-muted-foreground">{p.rating}</span>
+                    </div>
+                    <div className="mt-auto flex items-baseline gap-1.5">
+                      <span className="text-sm font-bold text-foreground">₹{p.price}</span>
+                      {p.originalPrice && (
+                        <span className="text-[11px] text-muted-foreground line-through">₹{p.originalPrice}</span>
+                      )}
+                    </div>
+                  </>
+                )}
+                {p.coming_soon && (
+                  <p className="mt-auto text-[11px] font-semibold text-muted-foreground">Launching soon</p>
+                )}
               </div>
             </div>
           ))}

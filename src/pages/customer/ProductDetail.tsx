@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Star, ArrowLeft, ChevronDown, ChevronUp, Play } from "lucide-react";
+import { Star, ArrowLeft, ChevronDown, ChevronUp, Play, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ProductRow from "@/components/ProductRow";
 import { useCart } from "@/hooks/useCart";
@@ -21,6 +21,7 @@ interface ProductData {
   video_url: string | null;
   category: string | null;
   stock: number;
+  coming_soon?: boolean;
 }
 
 const getYoutubeEmbedUrl = (url: string, autoplay = false) => {
@@ -152,7 +153,7 @@ const ProductDetail = () => {
       let productData: ProductData | null = null;
       const { data } = await supabase
         .from("products")
-        .select("id, name, price, mrp, discount_rate, description, image_url, image_url_2, image_url_3, video_url, category, stock")
+        .select("id, name, price, mrp, discount_rate, description, image_url, image_url_2, image_url_3, video_url, category, stock, coming_soon")
         .eq("id", id)
         .eq("is_active", true)
         .maybeSingle();
@@ -165,7 +166,7 @@ const ProductDetail = () => {
         // Fallback: check seller_products table
         const { data: sellerData } = await supabase
           .from("seller_products")
-          .select("id, name, price, mrp, discount_rate, description, image_url, image_url_2, image_url_3, video_url, category, stock, seller_id")
+          .select("id, name, price, mrp, discount_rate, description, image_url, image_url_2, image_url_3, video_url, category, stock, seller_id, coming_soon")
           .eq("id", id)
           .eq("is_active", true)
           .eq("is_approved", true)
@@ -215,6 +216,8 @@ const ProductDetail = () => {
   }
 
   const effectiveStock = availableStock ?? product.stock;
+  const isComingSoon = product.coming_soon === true;
+  const isOrderBlocked = isComingSoon || effectiveStock <= 0;
 
   const discountPercent = product.mrp > product.price
     ? Math.round(((product.mrp - product.price) / product.mrp) * 100)
@@ -321,7 +324,13 @@ const ProductDetail = () => {
               )}
             </div>
 
-            {effectiveStock <= 0 && (
+            {isComingSoon && (
+              <div className="mt-2 flex items-center gap-1.5 rounded-md bg-warning/10 px-3 py-1.5 w-fit border border-warning/30">
+                <Clock className="h-4 w-4 text-warning" />
+                <span className="text-sm font-semibold text-warning">Coming Soon — Not available for order yet</span>
+              </div>
+            )}
+            {!isComingSoon && effectiveStock <= 0 && (
               <p className="mt-2 text-sm font-medium text-destructive">Out of stock</p>
             )}
 
@@ -346,10 +355,10 @@ const ProductDetail = () => {
 
             {/* Sticky Add to Cart (desktop) */}
             <div className="mt-6 hidden gap-3 md:flex">
-              <Button variant="outline" className="flex-1" disabled={effectiveStock <= 0} onClick={handleAddToCart}>
+              <Button variant="outline" className="flex-1" disabled={isOrderBlocked} onClick={handleAddToCart}>
                 Add to cart
               </Button>
-              <Button className="flex-1" disabled={effectiveStock <= 0} onClick={handleBuyNow}>
+              <Button className="flex-1" disabled={isOrderBlocked} onClick={handleBuyNow}>
                 Buy at ₹{product.price}
               </Button>
             </div>
@@ -366,10 +375,10 @@ const ProductDetail = () => {
 
       {/* Mobile sticky bottom bar */}
       <div className="fixed bottom-0 left-0 right-0 z-30 flex gap-2 border-t border-border bg-background p-3 md:hidden">
-        <Button variant="outline" className="flex-1" disabled={effectiveStock <= 0} onClick={handleAddToCart}>
+        <Button variant="outline" className="flex-1" disabled={isOrderBlocked} onClick={handleAddToCart}>
           Add to cart
         </Button>
-        <Button className="flex-1" disabled={effectiveStock <= 0} onClick={handleBuyNow}>
+        <Button className="flex-1" disabled={isOrderBlocked} onClick={handleBuyNow}>
           Buy at ₹{product.price}
         </Button>
       </div>

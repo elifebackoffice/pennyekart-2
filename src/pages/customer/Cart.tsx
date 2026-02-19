@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Minus, Plus, Trash2, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Minus, Plus, Trash2, ShieldCheck, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/hooks/useCart";
 import { useAuth } from "@/hooks/useAuth";
@@ -31,6 +31,7 @@ const Cart = () => {
   const couponDiscount = appliedCoupon?.discount ?? 0;
   const walletDeduction = useWallet ? Math.min(walletBalance, totalPrice + platformFee - couponDiscount) : 0;
   const finalAmount = totalPrice + platformFee - couponDiscount - walletDeduction;
+  const hasComingSoonItems = items.some(i => i.coming_soon);
 
   const handleApplyCoupon = () => {
     setCouponError("");
@@ -166,6 +167,14 @@ const Cart = () => {
           <div className="flex-1 rounded-lg border border-border bg-card shadow-sm">
             {/* Items */}
             <div className="divide-y divide-border">
+              {hasComingSoonItems && (
+                <div className="flex items-center gap-2 bg-warning/10 border-b border-warning/30 px-4 py-3">
+                  <Clock className="h-4 w-4 shrink-0 text-warning" />
+                  <p className="text-sm font-medium text-warning">
+                    Some items are marked <strong>Coming Soon</strong> and cannot be ordered yet. Please remove them to proceed.
+                  </p>
+                </div>
+              )}
               {items.map(item => (
                 <div key={item.id} className="p-4">
                   <div className="flex gap-4">
@@ -178,7 +187,14 @@ const Cart = () => {
                     />
                     {/* Info */}
                     <div className="flex flex-1 flex-col gap-1">
-                      <span className="line-clamp-2 text-sm text-foreground">{item.name}</span>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="line-clamp-2 text-sm text-foreground">{item.name}</span>
+                        {item.coming_soon && (
+                          <span className="flex items-center gap-1 rounded-full bg-warning/15 px-2 py-0.5 text-[10px] font-bold text-warning border border-warning/30">
+                            <Clock className="h-3 w-3" /> Coming Soon
+                          </span>
+                        )}
+                      </div>
                       <div className="mt-1 flex items-baseline gap-2">
                         {item.mrp > item.price && (
                           <span className="text-xs text-muted-foreground line-through">₹{item.mrp}</span>
@@ -225,7 +241,7 @@ const Cart = () => {
 
             {/* Place Order - bottom of left card (mobile) */}
             <div className="border-t border-border p-4 lg:hidden">
-              <Button className="w-full text-base font-semibold py-5" onClick={handlePlaceOrder}>Place Order</Button>
+              <Button className="w-full text-base font-semibold py-5" onClick={handlePlaceOrder} disabled={hasComingSoonItems}>Place Order</Button>
             </div>
           </div>
 
@@ -340,7 +356,7 @@ const Cart = () => {
 
             {/* Place Order - desktop */}
             <div className="hidden lg:block">
-              <Button className="w-full text-base font-semibold py-5" onClick={handlePlaceOrder}>Place Order</Button>
+              <Button className="w-full text-base font-semibold py-5" onClick={handlePlaceOrder} disabled={hasComingSoonItems}>Place Order</Button>
             </div>
 
             {/* Trust badge */}
