@@ -69,6 +69,11 @@ const CustomerLogin = () => {
             <p className="text-center text-sm text-muted-foreground">
               New customer? <Link to="/customer/signup" className="text-primary underline">Sign up here</Link>
             </p>
+            <div className="flex justify-center gap-4 text-xs text-muted-foreground pt-2">
+              <Link to="/selling-partner/login" className="text-primary underline">Selling Partner Login</Link>
+              <span>·</span>
+              <Link to="/delivery-staff/login" className="text-primary underline">Delivery Partner Login</Link>
+            </div>
           </form>
         </CardContent>
       </Card>
