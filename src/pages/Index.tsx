@@ -120,7 +120,7 @@ const Index = () => {
       </header>
 
       <main className="relative z-0 space-y-2">
-        <CategoryBar />
+        <CategoryBar onCategoryClick={handleCategoryClick} selectedCategory={selectedCategory} />
         <BannerCarousel />
         <GroceryCategories onCategoryClick={handleCategoryClick} selectedCategory={selectedCategory} />
         {renderSectionProducts()}
