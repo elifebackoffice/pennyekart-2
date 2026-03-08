@@ -4,9 +4,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, MapPin, ShoppingCart, Wallet, TrendingUp, CalendarDays, UserCheck, UserX, Activity, Download } from "lucide-react";
+import { Users, MapPin, ShoppingCart, Wallet, TrendingUp, CalendarDays, UserCheck, UserX, Activity, Download, Clock, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { format, subDays } from "date-fns";
+import { format, subDays, formatDistanceToNow, differenceInDays, differenceInHours } from "date-fns";
 
 interface Profile {
   id: string;
@@ -161,6 +161,44 @@ const CustomerList = ({ customers, orderSummaries, walletSummaries }: CustomerLi
     return { totalOrders, totalRevenue, activeCustomers, totalWalletBalance };
   }, [filtered, orderSummaries, walletSummaries]);
 
+  // Recent activity stats
+  const recentActivity = useMemo(() => {
+    const now = new Date();
+    let today = 0, last7 = 0, last30 = 0;
+    const recentCustomers: { name: string; ago: string; amount: number }[] = [];
+
+    customers.forEach((c) => {
+      const o = orderSummaries?.get(c.user_id);
+      if (!o?.last_order_date) return;
+      const lastDate = new Date(o.last_order_date);
+      const days = differenceInDays(now, lastDate);
+      if (days === 0) today++;
+      if (days <= 7) last7++;
+      if (days <= 30) last30++;
+    });
+
+    // Get 5 most recent customers
+    const sortedByRecent = [...customers]
+      .filter((c) => orderSummaries?.get(c.user_id)?.last_order_date)
+      .sort((a, b) => {
+        const dA = orderSummaries?.get(a.user_id)?.last_order_date ?? "";
+        const dB = orderSummaries?.get(b.user_id)?.last_order_date ?? "";
+        return dB.localeCompare(dA);
+      })
+      .slice(0, 5);
+
+    sortedByRecent.forEach((c) => {
+      const o = orderSummaries?.get(c.user_id)!;
+      recentCustomers.push({
+        name: c.full_name ?? "Unknown",
+        ago: formatDistanceToNow(new Date(o.last_order_date!), { addSuffix: true }),
+        amount: o.total_spent,
+      });
+    });
+
+    return { today, last7, last30, recentCustomers };
+  }, [customers, orderSummaries]);
+
   const topPanchayaths = useMemo(() => {
     return Array.from(panchayathStats.entries())
       .filter(([key]) => key !== "__none")
@@ -169,6 +207,18 @@ const CustomerList = ({ customers, orderSummaries, walletSummaries }: CustomerLi
   }, [panchayathStats]);
 
   const fmt = (n: number) => n >= 1000 ? `₹${(n / 1000).toFixed(1)}K` : `₹${n.toFixed(0)}`;
+
+  const getRelativeTime = (dateStr: string | null | undefined) => {
+    if (!dateStr) return null;
+    const date = new Date(dateStr);
+    const hours = differenceInHours(new Date(), date);
+    if (hours < 1) return "Just now";
+    if (hours < 24) return `${hours}h ago`;
+    const days = differenceInDays(new Date(), date);
+    if (days < 7) return `${days}d ago`;
+    if (days < 30) return `${Math.floor(days / 7)}w ago`;
+    return format(date, "dd MMM");
+  };
 
   const getStatusBadge = (c: Profile) => {
     const status = classifyCustomer(c);
@@ -265,6 +315,57 @@ const CustomerList = ({ customers, orderSummaries, walletSummaries }: CustomerLi
           </CardHeader>
           <CardContent className="px-4 pb-4">
             <p className="text-2xl font-bold">{fmt(stats.totalWalletBalance)}</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Recent Activity Tracker */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <Card>
+          <CardHeader className="pb-2 pt-4 px-4">
+            <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+              <Zap className="h-3.5 w-3.5" /> Recent Order Activity
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-4 pb-4">
+            <div className="flex items-center gap-4">
+              <div className="text-center">
+                <p className="text-2xl font-bold text-emerald-600">{recentActivity.today}</p>
+                <p className="text-[10px] text-muted-foreground">Today</p>
+              </div>
+              <div className="h-8 w-px bg-border" />
+              <div className="text-center">
+                <p className="text-2xl font-bold text-blue-600">{recentActivity.last7}</p>
+                <p className="text-[10px] text-muted-foreground">Last 7 days</p>
+              </div>
+              <div className="h-8 w-px bg-border" />
+              <div className="text-center">
+                <p className="text-2xl font-bold text-amber-600">{recentActivity.last30}</p>
+                <p className="text-[10px] text-muted-foreground">Last 30 days</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2 pt-4 px-4">
+            <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+              <Clock className="h-3.5 w-3.5" /> Latest Customer Orders
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-4 pb-4">
+            {recentActivity.recentCustomers.length > 0 ? (
+              <div className="space-y-1.5">
+                {recentActivity.recentCustomers.map((rc, i) => (
+                  <div key={i} className="flex items-center justify-between text-xs">
+                    <span className="font-medium truncate max-w-[140px]">{rc.name}</span>
+                    <span className="text-muted-foreground">{rc.ago}</span>
+                    <Badge variant="outline" className="font-mono text-[10px]">₹{rc.amount.toFixed(0)}</Badge>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">No recent orders</p>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -434,7 +535,12 @@ const CustomerList = ({ customers, orderSummaries, walletSummaries }: CustomerLi
                     {o && o.total_spent > 0 ? `₹${o.total_spent.toFixed(0)}` : "—"}
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-                    {o?.last_order_date ? format(new Date(o.last_order_date), "dd MMM yyyy") : "—"}
+                    {o?.last_order_date ? (
+                      <div className="flex flex-col">
+                        <span className="font-medium text-foreground">{getRelativeTime(o.last_order_date)}</span>
+                        <span className="text-[10px]">{format(new Date(o.last_order_date), "dd MMM yyyy")}</span>
+                      </div>
+                    ) : "—"}
                   </TableCell>
                   <TableCell className="text-right">
                     {w && w.balance > 0 ? (
