@@ -159,7 +159,7 @@ const Index = () => {
       const rows: React.ReactNode[] = [];
 
       if (selectedItems.length > 0) {
-        rows.push(<ProductRow key={selectedCategory} title={selectedCategory} products={toRowFormat(applySorting(selectedItems))} />);
+        rows.push(<ProductRow key={selectedCategory} title={selectedCategory} products={toRowFormat(applySorting(selectedItems)selectedItems))} />);
       } else {
         rows.push(
           <div key="empty" className="py-4 text-center text-muted-foreground">
@@ -173,7 +173,7 @@ const Index = () => {
         .filter(([cat]) => cat !== selectedCategory)
         .forEach(([cat, items]) => {
           if (items.length > 0) {
-            rows.push(<ProductRow key={cat} title={cat} products={toRowFormat(items)} />);
+            rows.push(<ProductRow key={cat} title={cat} productsapplySorting(items)owFormat(items)} />);
           }
         });
 
