@@ -4,11 +4,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, MapPin, ShoppingCart, Wallet, TrendingUp, CalendarDays, UserCheck, UserX, Activity, Download, Clock, Zap, Search, Phone } from "lucide-react";
+import { Users, MapPin, ShoppingCart, Wallet, TrendingUp, CalendarDays, UserCheck, UserX, Activity, Download, Clock, Zap, Search, Phone, Ban, CheckCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { format, subDays, formatDistanceToNow, differenceInDays, differenceInHours } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface Profile {
   id: string;
@@ -22,6 +24,7 @@ interface Profile {
   district_name?: string | null;
   created_at?: string;
   last_login_at?: string | null;
+  is_blocked?: boolean;
 }
 
 interface OrderSummary {
@@ -47,18 +50,35 @@ interface CustomerListProps {
   customers: Profile[];
   orderSummaries?: Map<string, OrderSummary>;
   walletSummaries?: Map<string, WalletSummary>;
+  onRefresh?: () => void;
 }
 
-type ActivityFilter = "all" | "active" | "inactive" | "new" | "never_ordered";
+type ActivityFilter = "all" | "active" | "inactive" | "new" | "never_ordered" | "blocked";
 type InactivePeriod = "7" | "30" | "60" | "90";
 
-const CustomerList = ({ customers, orderSummaries, walletSummaries }: CustomerListProps) => {
+const CustomerList = ({ customers, orderSummaries, walletSummaries, onRefresh }: CustomerListProps) => {
   const [filterPanchayath, setFilterPanchayath] = useState("all");
   const [filterWard, setFilterWard] = useState("all");
   const [sortBy, setSortBy] = useState<string>("newest");
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>("all");
   const [inactivePeriod, setInactivePeriod] = useState<InactivePeriod>("30");
   const [searchHistories, setSearchHistories] = useState<Map<string, SearchHistorySummary>>(new Map());
+  const { toast } = useToast();
+
+  // Toggle customer block status
+  const toggleBlock = async (userId: string, currentBlocked: boolean) => {
+    const { error } = await supabase
+      .from("profiles")
+      .update({ is_blocked: !currentBlocked })
+      .eq("user_id", userId);
+    
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: !currentBlocked ? "Customer blocked" : "Customer unblocked" });
+      onRefresh?.();
+    }
+  };
   const [mobileSearch, setMobileSearch] = useState("");
 
   // Fetch search histories for all customers
@@ -159,7 +179,9 @@ const CustomerList = ({ customers, orderSummaries, walletSummaries }: CustomerLi
       }
       if (filterPanchayath !== "all" && c.local_body_id !== filterPanchayath) return false;
       if (filterWard !== "all" && String(c.ward_number) !== filterWard) return false;
-      if (activityFilter !== "all") {
+      if (activityFilter === "blocked") {
+        if (!c.is_blocked) return false;
+      } else if (activityFilter !== "all") {
         const status = classifyCustomer(c);
         if (activityFilter !== status) return false;
       }
@@ -192,8 +214,9 @@ const CustomerList = ({ customers, orderSummaries, walletSummaries }: CustomerLi
       if (filterWard !== "all" && String(c.ward_number) !== filterWard) return false;
       return true;
     });
-    const counts = { all: locationFiltered.length, active: 0, inactive: 0, new: 0, never_ordered: 0 };
+    const counts = { all: locationFiltered.length, active: 0, inactive: 0, new: 0, never_ordered: 0, blocked: 0 };
     locationFiltered.forEach((c) => {
+      if (c.is_blocked) counts.blocked++;
       const status = classifyCustomer(c);
       counts[status]++;
     });
@@ -453,6 +476,9 @@ const CustomerList = ({ customers, orderSummaries, walletSummaries }: CustomerLi
                 <TabsTrigger value="never_ordered" className="text-xs h-7 px-3">
                   Never Ordered <Badge className="ml-1 text-[10px] px-1.5 bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-0">{activityCounts.never_ordered}</Badge>
                 </TabsTrigger>
+                <TabsTrigger value="blocked" className="text-xs h-7 px-3">
+                  <Ban className="h-3 w-3 mr-1" /> Blocked <Badge className="ml-1 text-[10px] px-1.5 bg-destructive/10 text-destructive border-0">{activityCounts.blocked}</Badge>
+                </TabsTrigger>
               </TabsList>
             </Tabs>
             {(activityFilter === "inactive" || activityFilter === "all") && (
@@ -569,6 +595,7 @@ const CustomerList = ({ customers, orderSummaries, walletSummaries }: CustomerLi
               <TableHead>Name</TableHead>
               <TableHead>Mobile</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Active</TableHead>
               <TableHead>Joined</TableHead>
               <TableHead>Last Login</TableHead>
               <TableHead className="text-center">Orders</TableHead>
@@ -586,11 +613,29 @@ const CustomerList = ({ customers, orderSummaries, walletSummaries }: CustomerLi
               const w = walletSummaries?.get(c.user_id);
               const sh = searchHistories.get(c.user_id);
               return (
-                <TableRow key={c.id}>
+                <TableRow key={c.id} className={c.is_blocked ? "bg-destructive/5" : undefined}>
                   <TableCell className="text-muted-foreground">{i + 1}</TableCell>
-                  <TableCell className="font-medium">{c.full_name ?? "—"}</TableCell>
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-1.5">
+                      {c.is_blocked && <Ban className="h-3.5 w-3.5 text-destructive" />}
+                      {c.full_name ?? "—"}
+                    </div>
+                  </TableCell>
                   <TableCell>{c.mobile_number ?? "—"}</TableCell>
                   <TableCell>{getStatusBadge(c)}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Switch 
+                        checked={!c.is_blocked}
+                        onCheckedChange={() => toggleBlock(c.user_id, c.is_blocked ?? false)}
+                      />
+                      {c.is_blocked ? (
+                        <Badge variant="destructive" className="text-[10px]">Blocked</Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-[10px] text-emerald-600 border-emerald-200">Active</Badge>
+                      )}
+                    </div>
+                  </TableCell>
                   <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                     {c.created_at ? (
                       <span className="flex items-center gap-1">
@@ -669,7 +714,7 @@ const CustomerList = ({ customers, orderSummaries, walletSummaries }: CustomerLi
             })}
             {filtered.length === 0 && (
               <TableRow>
-                <TableCell colSpan={13} className="text-center text-muted-foreground py-8">No customers found</TableCell>
+                <TableCell colSpan={14} className="text-center text-muted-foreground py-8">No customers found</TableCell>
               </TableRow>
             )}
           </TableBody>
