@@ -224,7 +224,7 @@ const PurchasePage = () => {
     setHistoryLoading(true);
     let query = supabase
       .from("godown_stock")
-      .select("id, quantity, purchase_price, batch_number, expiry_date, created_at, godown_id, product_id")
+      .select("id, quantity, purchase_price, batch_number, expiry_date, narration, created_at, godown_id, product_id")
       .order("created_at", { ascending: false })
       .limit(100);
 
