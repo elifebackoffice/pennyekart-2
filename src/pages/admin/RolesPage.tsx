@@ -7,12 +7,44 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, Shield, Users, Clock, Edit2, Check, X } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Plus, Trash2, Shield, Users, Clock, Edit2, Check, X, LayoutDashboard, ShoppingCart, Package, MapPin, Warehouse, Tags, Zap, Wallet, Settings, HardDrive, Truck, FileText, Crown, Image } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 interface Role { id: string; name: string; description: string | null; created_at: string; updated_at: string; }
 interface Permission { id: string; name: string; description: string | null; feature: string; action: string; }
 interface RolePermission { role_id: string; permission_id: string; }
+
+const featureIcons: Record<string, React.ComponentType<{ className?: string }>> = {
+  dashboard: LayoutDashboard,
+  users: Users,
+  products: Package,
+  orders: ShoppingCart,
+  categories: Tags,
+  banners: Image,
+  locations: MapPin,
+  godowns: Warehouse,
+  stock: Package,
+  purchase: FileText,
+  offers: Zap,
+  penny_prime: Crown,
+  wallets: Wallet,
+  settings: Settings,
+  storage: HardDrive,
+  delivery: Truck,
+  delivery_staff: Truck,
+  selling_partners: Users,
+  sellers: Users,
+  services: Settings,
+  reports: FileText,
+};
+
+const featureOrder = [
+  'dashboard', 'users', 'products', 'categories', 'orders', 'banners',
+  'locations', 'godowns', 'stock', 'purchase', 'offers', 'penny_prime',
+  'wallets', 'delivery', 'delivery_staff', 'selling_partners', 'sellers',
+  'services', 'reports', 'settings', 'storage'
+];
 
 const RolesPage = () => {
   const [roles, setRoles] = useState<Role[]>([]);
@@ -69,13 +101,40 @@ const RolesPage = () => {
     fetchData();
   };
 
+  const toggleAllFeaturePerms = async (roleId: string, featurePerms: Permission[], allGranted: boolean) => {
+    if (allGranted) {
+      // Remove all
+      for (const p of featurePerms) {
+        await supabase.from("role_permissions").delete().eq("role_id", roleId).eq("permission_id", p.id);
+      }
+    } else {
+      // Add missing
+      for (const p of featurePerms) {
+        if (!hasPermission(roleId, p.id)) {
+          await supabase.from("role_permissions").insert({ role_id: roleId, permission_id: p.id });
+        }
+      }
+    }
+    fetchData();
+  };
+
   const hasPermission = (roleId: string, permId: string) =>
     rolePerms.some((rp) => rp.role_id === roleId && rp.permission_id === permId);
 
   const getPermCount = (roleId: string) => rolePerms.filter((rp) => rp.role_id === roleId).length;
 
-  const features = [...new Set(permissions.map((p) => p.feature))];
+  const features = [...new Set(permissions.map((p) => p.feature))].sort((a, b) => {
+    const aIdx = featureOrder.indexOf(a);
+    const bIdx = featureOrder.indexOf(b);
+    if (aIdx === -1 && bIdx === -1) return a.localeCompare(b);
+    if (aIdx === -1) return 1;
+    if (bIdx === -1) return -1;
+    return aIdx - bIdx;
+  });
+  
   const selectedRoleData = roles.find((r) => r.id === selectedRole);
+
+  const formatFeatureName = (feat: string) => feat.replace(/_/g, ' ');
 
   return (
     <AdminLayout>
@@ -122,69 +181,71 @@ const RolesPage = () => {
             </div>
 
             {/* Roles list */}
-            <div className="space-y-2">
-              {roles.map((r) => (
-                <div
-                  key={r.id}
-                  className={`group cursor-pointer rounded-lg border p-3 transition-all ${
-                    selectedRole === r.id 
-                      ? "border-primary bg-primary/5 ring-1 ring-primary" 
-                      : "hover:border-muted-foreground/30 hover:bg-muted/50"
-                  }`}
-                  onClick={() => setSelectedRole(r.id)}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium capitalize">{r.name}</span>
-                        <Badge variant="secondary" className="text-xs">
-                          {getPermCount(r.id)} perms
-                        </Badge>
-                      </div>
-                      {editingDesc === r.id ? (
-                        <div className="mt-1.5 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                          <Input
-                            value={editDescValue}
-                            onChange={(e) => setEditDescValue(e.target.value)}
-                            className="h-7 text-xs"
-                            placeholder="Add description..."
-                          />
-                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => updateDescription(r.id)}>
-                            <Check className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditingDesc(null)}>
-                            <X className="h-3.5 w-3.5" />
-                          </Button>
+            <ScrollArea className="h-[400px]">
+              <div className="space-y-2 pr-3">
+                {roles.map((r) => (
+                  <div
+                    key={r.id}
+                    className={`group cursor-pointer rounded-lg border p-3 transition-all ${
+                      selectedRole === r.id 
+                        ? "border-primary bg-primary/5 ring-1 ring-primary" 
+                        : "hover:border-muted-foreground/30 hover:bg-muted/50"
+                    }`}
+                    onClick={() => setSelectedRole(r.id)}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium capitalize">{r.name}</span>
+                          <Badge variant="secondary" className="text-xs">
+                            {getPermCount(r.id)} perms
+                          </Badge>
                         </div>
-                      ) : (
-                        <p 
-                          className="mt-0.5 text-xs text-muted-foreground line-clamp-1 group-hover:cursor-text"
-                          onClick={(e) => { e.stopPropagation(); setEditingDesc(r.id); setEditDescValue(r.description || ""); }}
-                        >
-                          {r.description || <span className="italic opacity-50">No description</span>}
-                          <Edit2 className="ml-1 inline h-3 w-3 opacity-0 group-hover:opacity-50" />
-                        </p>
-                      )}
-                      <div className="mt-1.5 flex items-center gap-1 text-[10px] text-muted-foreground/70">
-                        <Clock className="h-3 w-3" />
-                        Updated {formatDistanceToNow(new Date(r.updated_at), { addSuffix: true })}
+                        {editingDesc === r.id ? (
+                          <div className="mt-1.5 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                            <Input
+                              value={editDescValue}
+                              onChange={(e) => setEditDescValue(e.target.value)}
+                              className="h-7 text-xs"
+                              placeholder="Add description..."
+                            />
+                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => updateDescription(r.id)}>
+                              <Check className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditingDesc(null)}>
+                              <X className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <p 
+                            className="mt-0.5 text-xs text-muted-foreground line-clamp-1 group-hover:cursor-text"
+                            onClick={(e) => { e.stopPropagation(); setEditingDesc(r.id); setEditDescValue(r.description || ""); }}
+                          >
+                            {r.description || <span className="italic opacity-50">No description</span>}
+                            <Edit2 className="ml-1 inline h-3 w-3 opacity-0 group-hover:opacity-50" />
+                          </p>
+                        )}
+                        <div className="mt-1.5 flex items-center gap-1 text-[10px] text-muted-foreground/70">
+                          <Clock className="h-3 w-3" />
+                          Updated {formatDistanceToNow(new Date(r.updated_at), { addSuffix: true })}
+                        </div>
                       </div>
+                      <Button 
+                        variant="ghost" 
+                        size="icon"
+                        className="h-7 w-7 opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive"
+                        onClick={(e) => { e.stopPropagation(); deleteRole(r.id); }}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
                     </div>
-                    <Button 
-                      variant="ghost" 
-                      size="icon"
-                      className="h-7 w-7 opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive"
-                      onClick={(e) => { e.stopPropagation(); deleteRole(r.id); }}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
                   </div>
-                </div>
-              ))}
-              {roles.length === 0 && (
-                <p className="py-8 text-center text-sm text-muted-foreground">No roles created yet</p>
-              )}
-            </div>
+                ))}
+                {roles.length === 0 && (
+                  <p className="py-8 text-center text-sm text-muted-foreground">No roles created yet</p>
+                )}
+              </div>
+            </ScrollArea>
           </CardContent>
         </Card>
 
@@ -211,42 +272,60 @@ const RolesPage = () => {
           </CardHeader>
           <CardContent>
             {selectedRole ? (
-              <div className="space-y-6">
-                {features.map((feat) => {
-                  const featurePerms = permissions.filter((p) => p.feature === feat);
-                  const grantedCount = featurePerms.filter((p) => hasPermission(selectedRole, p.id)).length;
-                  
-                  return (
-                    <div key={feat} className="rounded-lg border p-4">
-                      <div className="mb-3 flex items-center justify-between">
-                        <h3 className="text-sm font-semibold capitalize">{feat}</h3>
-                        <Badge variant={grantedCount === featurePerms.length ? "default" : grantedCount > 0 ? "secondary" : "outline"}>
-                          {grantedCount}/{featurePerms.length}
-                        </Badge>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                        {featurePerms.map((p) => {
-                          const has = hasPermission(selectedRole, p.id);
-                          return (
-                            <label 
-                              key={p.id} 
-                              className={`flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors ${
-                                has ? "border-primary/50 bg-primary/5" : "hover:bg-muted/50"
-                              }`}
+              <ScrollArea className="h-[500px] pr-4">
+                <div className="space-y-4">
+                  {features.map((feat) => {
+                    const featurePerms = permissions.filter((p) => p.feature === feat);
+                    const grantedCount = featurePerms.filter((p) => hasPermission(selectedRole, p.id)).length;
+                    const allGranted = grantedCount === featurePerms.length;
+                    const Icon = featureIcons[feat] || Shield;
+                    
+                    return (
+                      <div key={feat} className="rounded-lg border p-4">
+                        <div className="mb-3 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Icon className="h-4 w-4 text-muted-foreground" />
+                            <h3 className="text-sm font-semibold capitalize">{formatFeatureName(feat)}</h3>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant={allGranted ? "default" : grantedCount > 0 ? "secondary" : "outline"}>
+                              {grantedCount}/{featurePerms.length}
+                            </Badge>
+                            <Button
+                              size="sm"
+                              variant={allGranted ? "outline" : "default"}
+                              className="h-7 text-xs"
+                              onClick={() => toggleAllFeaturePerms(selectedRole, featurePerms, allGranted)}
                             >
-                              <Checkbox 
-                                checked={has} 
-                                onCheckedChange={() => togglePermission(selectedRole, p.id, has)} 
-                              />
-                              <span className="capitalize">{p.action}</span>
-                            </label>
-                          );
-                        })}
+                              {allGranted ? "Revoke All" : "Grant All"}
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                          {featurePerms.map((p) => {
+                            const has = hasPermission(selectedRole, p.id);
+                            return (
+                              <label 
+                                key={p.id} 
+                                className={`flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors ${
+                                  has ? "border-primary/50 bg-primary/5" : "hover:bg-muted/50"
+                                }`}
+                                title={p.description || undefined}
+                              >
+                                <Checkbox 
+                                  checked={has} 
+                                  onCheckedChange={() => togglePermission(selectedRole, p.id, has)} 
+                                />
+                                <span className="capitalize">{p.action}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              </ScrollArea>
             ) : (
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <Shield className="mb-3 h-12 w-12 text-muted-foreground/30" />
