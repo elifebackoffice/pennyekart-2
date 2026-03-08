@@ -36,6 +36,7 @@ const AUTO_ASSIGN_LIMIT = 10;
 
 const OffersPage = () => {
   const [products, setProducts] = useState<Product[]>([]);
+  const [featuredSellerProducts, setFeaturedSellerProducts] = useState<Product[]>([]);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [addDialogSection, setAddDialogSection] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -49,7 +50,19 @@ const OffersPage = () => {
       .select("id, name, price, mrp, image_url, section, is_active, category")
       .eq("is_active", true)
       .order("name");
-    setProducts((data as Product[]) ?? []);
+    setProducts((data ?? []).map((p) => ({ ...p, source: "admin" as const })));
+  };
+
+  const fetchFeaturedSellerProducts = async () => {
+    const { data } = await supabase
+      .from("seller_products")
+      .select("id, name, price, mrp, image_url, is_active, category, is_featured")
+      .eq("is_active", true)
+      .eq("is_approved", true)
+      .eq("is_featured", true);
+    setFeaturedSellerProducts(
+      (data ?? []).map((p) => ({ ...p, section: "featured", source: "seller" as const }))
+    );
   };
 
   const fetchAllProducts = async () => {
@@ -63,11 +76,14 @@ const OffersPage = () => {
 
   useEffect(() => {
     fetchProducts();
+    fetchFeaturedSellerProducts();
   }, []);
 
   const grouped = sectionConfig.map((sec) => ({
     ...sec,
-    items: products.filter((p) => p.section === sec.key),
+    items: sec.key === "featured"
+      ? [...products.filter((p) => p.section === sec.key), ...featuredSellerProducts]
+      : products.filter((p) => p.section === sec.key),
   }));
 
   const handleRemoveFromSection = async (productId: string) => {
