@@ -777,6 +777,17 @@ const Cart = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Wallet Reward Popup */}
+      <WalletRewardPopup
+        open={!!walletRewardPopup}
+        onClose={() => {
+          setWalletRewardPopup(null);
+          navigate("/");
+        }}
+        rewards={walletRewardPopup?.rewards ?? []}
+        totalAmount={walletRewardPopup?.total ?? 0}
+      />
     </div>
   );
 };
