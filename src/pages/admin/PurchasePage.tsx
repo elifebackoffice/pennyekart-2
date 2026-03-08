@@ -70,6 +70,7 @@ const PurchasePage = () => {
   // Bill info
   const [purchaseNumber, setPurchaseNumber] = useState("...");
   const [purchaseDate, setPurchaseDate] = useState(new Date().toISOString().split("T")[0]);
+  const [narration, setNarration] = useState("");
 
   const fetchNextPurchaseNumber = async () => {
     const { data } = await supabase.from("purchase_counter").select("last_number").limit(1).single();
