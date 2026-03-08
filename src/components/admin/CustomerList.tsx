@@ -595,6 +595,7 @@ const CustomerList = ({ customers, orderSummaries, walletSummaries, onRefresh }:
               <TableHead>Name</TableHead>
               <TableHead>Mobile</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Active</TableHead>
               <TableHead>Joined</TableHead>
               <TableHead>Last Login</TableHead>
               <TableHead className="text-center">Orders</TableHead>
