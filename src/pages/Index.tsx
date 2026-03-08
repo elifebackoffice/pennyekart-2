@@ -133,6 +133,26 @@ const Index = () => {
     return acc;
   }, {});
 
+  // Merge section products from admin offers with area section products for logged-in customers
+  const mergedBySection = (() => {
+    if (!isCustomer) return {};
+    const merged: Record<string, any[]> = {};
+    for (const sec of sectionOrder) {
+      const sectionItems = sectionGrouped[sec]?.items || [];
+      const areaItems = areaBySection[sec] || [];
+      const seen = new Set<string>();
+      const combined: any[] = [];
+      for (const item of [...sectionItems, ...areaItems]) {
+        if (!seen.has(item.id)) {
+          seen.add(item.id);
+          combined.push(item);
+        }
+      }
+      if (combined.length > 0) merged[sec] = combined;
+    }
+    return merged;
+  })();
+
   const sectionLabels: Record<string, string> = {
     featured: "Featured Products",
     most_ordered: "Most Ordered Items",
@@ -174,22 +194,21 @@ const Index = () => {
       return rows;
     }
 
-    // For logged-in customers: show section rows from area products, then remaining by category
+    // For logged-in customers: show merged section rows, then remaining area products by category
     if (isCustomer) {
-      if (areaLoading) {
+      if (areaLoading && sectionLoading) {
         return <div className="py-8 text-center text-muted-foreground">Loading products for your area...</div>;
-      }
-      if (areaProducts.length === 0) {
-        return <div className="py-8 text-center text-muted-foreground">No products available in your area yet.</div>;
       }
 
       const sectionRows = sectionOrder
-        .filter(s => areaBySection[s]?.length > 0)
+        .filter(s => mergedBySection[s]?.length > 0)
         .map(sec => (
-          <ProductRow key={sec} title={sectionLabels[sec] || sec} products={toRowFormat(applySorting(areaBySection[sec]))} sectionKey={sec} />
+          <ProductRow key={sec} title={sectionLabels[sec] || sec} products={toRowFormat(applySorting(mergedBySection[sec]))} sectionKey={sec} />
         ));
 
-      const nonsectionProducts = areaProducts.filter(p => !p.section || p.section === "" || p.section === "seller");
+      // Show remaining area products (not in any section) by category
+      const sectionProductIds = new Set(Object.values(mergedBySection).flat().map((p: any) => p.id));
+      const nonsectionProducts = areaProducts.filter(p => !sectionProductIds.has(p.id) && (!p.section || p.section === "" || p.section === "seller"));
       const nonsectionByCategory = nonsectionProducts.reduce<Record<string, typeof areaProducts>>((acc, p) => {
         const cat = p.category || "Other";
         if (!acc[cat]) acc[cat] = [];
@@ -199,6 +218,10 @@ const Index = () => {
       const categoryRows = Object.entries(nonsectionByCategory).map(([cat, items]) =>
         items.length > 0 ? <ProductRow key={cat} title={cat} products={toRowFormat(applySorting(items))} /> : null
       );
+
+      if (sectionRows.length === 0 && categoryRows.length === 0) {
+        return <div className="py-8 text-center text-muted-foreground">No products available in your area yet.</div>;
+      }
 
       return [...sectionRows, ...categoryRows];
     }
