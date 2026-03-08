@@ -176,7 +176,7 @@ const UsersPage = () => {
       </Tabs>
 
       {isCustomerTab ? (
-        <CustomerList customers={filteredUsers} orderSummaries={orderSummaries} walletSummaries={walletSummaries} />
+        <CustomerList customers={filteredUsers} orderSummaries={orderSummaries} walletSummaries={walletSummaries} onRefresh={fetchData} />
       ) : (
         <div className="admin-table-wrap">
           <Table>
