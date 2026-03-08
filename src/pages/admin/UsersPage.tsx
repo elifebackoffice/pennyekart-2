@@ -19,6 +19,7 @@ interface Profile {
   role_id: string | null;
   is_super_admin: boolean;
   is_approved: boolean;
+  is_blocked: boolean;
   user_type: string;
   local_body_id: string | null;
   ward_number: number | null;
