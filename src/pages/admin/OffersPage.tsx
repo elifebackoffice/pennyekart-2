@@ -86,13 +86,22 @@ const OffersPage = () => {
       : products.filter((p) => p.section === sec.key),
   }));
 
-  const handleRemoveFromSection = async (productId: string) => {
-    const { error } = await supabase.from("products").update({ section: null }).eq("id", productId);
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-      return;
+  const handleRemoveFromSection = async (product: Product) => {
+    if (product.source === "seller") {
+      const { error } = await supabase.from("seller_products").update({ is_featured: false }).eq("id", product.id);
+      if (error) {
+        toast({ title: "Error", description: error.message, variant: "destructive" });
+        return;
+      }
+      fetchFeaturedSellerProducts();
+    } else {
+      const { error } = await supabase.from("products").update({ section: null }).eq("id", product.id);
+      if (error) {
+        toast({ title: "Error", description: error.message, variant: "destructive" });
+        return;
+      }
+      fetchProducts();
     }
-    fetchProducts();
     toast({ title: "Removed from section" });
   };
 
