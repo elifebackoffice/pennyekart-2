@@ -173,7 +173,7 @@ const UsersPage = () => {
       </Tabs>
 
       {isCustomerTab ? (
-        <CustomerList customers={filteredUsers} />
+        <CustomerList customers={filteredUsers} orderSummaries={orderSummaries} walletSummaries={walletSummaries} />
       ) : (
         <div className="admin-table-wrap">
           <Table>
