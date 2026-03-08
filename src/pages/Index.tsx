@@ -250,6 +250,7 @@ const Index = () => {
         <CartReminderBanner />
         <FlashSaleBanner />
         <CategoryBar onCategoryClick={handleCategoryClick} selectedCategory={selectedCategory} />
+        <SortFilterBar selected={sortBy} onChange={setSortBy} />
         <BannerCarousel />
         <GroceryCategories onCategoryClick={handleCategoryClick} selectedCategory={selectedCategory} />
         {renderSectionProducts()}
