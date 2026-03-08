@@ -127,6 +127,7 @@ const OffersPage = () => {
       if (clearError) throw clearError;
 
       let productIds: string[] = [];
+      let totalAssigned = 0;
 
       if (sectionKey === "featured") {
         // Get highest discount active admin products as featured
@@ -146,10 +147,8 @@ const OffersPage = () => {
           .eq("is_active", true)
           .eq("is_approved", true)
           .eq("is_featured", true);
-        const sellerFeaturedCount = (sellerFeatured ?? []).length;
-        totalCount = productIds.length + sellerFeaturedCount;
+        totalAssigned = productIds.length + (sellerFeatured ?? []).length;
       } else if (sectionKey === "low_budget") {
-        // Get cheapest active products
         const { data } = await supabase
           .from("products")
           .select("id")
@@ -158,8 +157,8 @@ const OffersPage = () => {
           .order("price", { ascending: true })
           .limit(AUTO_ASSIGN_LIMIT);
         productIds = (data ?? []).map((p) => p.id);
+        totalAssigned = productIds.length;
       } else if (sectionKey === "new_arrivals") {
-        // Get most recently created products
         const { data } = await supabase
           .from("products")
           .select("id")
@@ -168,8 +167,8 @@ const OffersPage = () => {
           .order("created_at", { ascending: false })
           .limit(AUTO_ASSIGN_LIMIT);
         productIds = (data ?? []).map((p) => p.id);
+        totalAssigned = productIds.length;
       } else if (sectionKey === "most_ordered") {
-        // Count product occurrences in orders
         const { data: orders } = await supabase
           .from("orders")
           .select("items");
@@ -188,9 +187,10 @@ const OffersPage = () => {
           .slice(0, AUTO_ASSIGN_LIMIT)
           .map(([id]) => id);
         productIds = sorted;
+        totalAssigned = productIds.length;
       }
 
-      // Assign section to selected products
+      // Assign section to selected admin products
       if (productIds.length > 0) {
         for (const id of productIds) {
           await supabase.from("products").update({ section: sectionKey }).eq("id", id).eq("is_active", true);
@@ -198,9 +198,10 @@ const OffersPage = () => {
       }
 
       await fetchProducts();
+      await fetchFeaturedSellerProducts();
       toast({
         title: "Auto-assigned",
-        description: `${productIds.length} products added to ${sectionConfig.find((s) => s.key === sectionKey)?.label}`,
+        description: `${totalAssigned} products in ${sectionConfig.find((s) => s.key === sectionKey)?.label}`,
       });
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
