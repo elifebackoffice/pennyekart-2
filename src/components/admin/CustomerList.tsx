@@ -183,7 +183,7 @@ const CustomerList = ({ customers, orderSummaries, walletSummaries }: CustomerLi
       }
     });
     return result;
-  }, [customers, filterPanchayath, filterWard, sortBy, activityFilter, inactivePeriod, orderSummaries, walletSummaries]);
+  }, [customers, filterPanchayath, filterWard, sortBy, activityFilter, inactivePeriod, orderSummaries, walletSummaries, mobileSearch]);
 
   // Activity counts (respecting location filters)
   const activityCounts = useMemo(() => {
