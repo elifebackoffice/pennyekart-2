@@ -230,6 +230,70 @@ const SellingPartnersPage = () => {
   const approvedCount = partners.filter((p) => p.is_approved).length;
   const pendingCount = partners.filter((p) => !p.is_approved).length;
 
+  const PartnerTable = ({ items, loading: isLoading }: { items: SellingPartner[]; loading: boolean }) => (
+    <div className="admin-table-wrap">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Name</TableHead>
+            <TableHead>Contact</TableHead>
+            <TableHead>Panchayath / Ward</TableHead>
+            <TableHead>Products</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Approved</TableHead>
+            <TableHead>Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {isLoading ? (
+            <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Loading...</TableCell></TableRow>
+          ) : items.length === 0 ? (
+            <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No selling partners found</TableCell></TableRow>
+          ) : items.map((p) => (
+            <TableRow key={p.id}>
+              <TableCell className="font-medium">{p.full_name ?? "—"}</TableCell>
+              <TableCell>
+                <div className="space-y-1">
+                  {p.email && <div className="flex items-center gap-1.5 text-sm"><Mail className="h-3.5 w-3.5 text-muted-foreground" />{p.email}</div>}
+                  {p.mobile_number && <div className="flex items-center gap-1.5 text-sm"><Phone className="h-3.5 w-3.5 text-muted-foreground" />{p.mobile_number}</div>}
+                </div>
+              </TableCell>
+              <TableCell>
+                <div className="space-y-0.5 text-sm">
+                  {p.local_body_name ? (
+                    <>
+                      <div className="font-medium">{p.local_body_name}</div>
+                      <div className="text-muted-foreground text-xs">
+                        {p.body_type && <span className="capitalize">{p.body_type}</span>}
+                        {p.ward_number && <span> · Ward {p.ward_number}</span>}
+                        {p.district_name && <span> · {p.district_name}</span>}
+                      </div>
+                    </>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </div>
+              </TableCell>
+              <TableCell>
+                <Badge variant="outline" className="gap-1"><Package className="h-3 w-3" />{p.product_count}</Badge>
+              </TableCell>
+              <TableCell><Badge variant={p.is_approved ? "default" : "secondary"}>{p.is_approved ? "Active" : "Pending"}</Badge></TableCell>
+              <TableCell><Switch checked={p.is_approved} onCheckedChange={() => toggleApproval(p.user_id, p.is_approved)} /></TableCell>
+              <TableCell>
+                <div className="flex gap-1">
+                  <Button variant="ghost" size="sm" onClick={() => setDetailPartner(p)} title="View Details"><User className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="sm" onClick={() => viewProducts(p)} title="Products"><Eye className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="sm" onClick={() => openGodownAssignment(p)} title="Assign Godowns"><MapPin className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="sm" onClick={() => openWallet(p)} title="Wallet"><Wallet className="h-4 w-4" /></Button>
+                </div>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+
   return (
     <AdminLayout>
       <div className="space-y-6">
