@@ -49,6 +49,7 @@ interface StockHistory {
   purchase_price: number;
   batch_number: string | null;
   expiry_date: string | null;
+  narration: string | null;
   created_at: string;
   godown_id: string;
   product_id: string;
