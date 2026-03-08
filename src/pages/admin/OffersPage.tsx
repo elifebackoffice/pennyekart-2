@@ -21,6 +21,7 @@ interface Product {
   section: string | null;
   is_active: boolean;
   category: string | null;
+  source?: "admin" | "seller";
 }
 
 const sectionConfig = [
