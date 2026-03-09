@@ -148,6 +148,7 @@ const SearchBar = () => {
     { icon: MapPin, label: "Saved Addresses", action: () => navigate("/customer/profile?tab=addresses") },
     { icon: Heart, label: "Wishlist", action: () => navigate("/customer/profile?tab=wishlist") },
     { icon: Bell, label: "Notifications", action: () => navigate("/customer/profile?tab=notifications") },
+    { icon: UserPlus, label: "Invite a Friend", action: () => setInviteOpen(true) },
     { icon: Download, label: "Download App", action: () => setDownloadDialogOpen(true) },
   ];
 
