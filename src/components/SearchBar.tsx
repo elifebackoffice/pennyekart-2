@@ -1,10 +1,11 @@
-import { Search, User, Wallet, ShoppingCart, LogOut, Package, MapPin, Heart, Bell, ChevronDown, Tag, Download, X } from "lucide-react";
+import { Search, User, Wallet, ShoppingCart, LogOut, Package, MapPin, Heart, Bell, ChevronDown, Tag, Download, X, UserPlus } from "lucide-react";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import DownloadAppDialog from "@/components/DownloadAppDialog";
+import InviteFriendDialog from "@/components/InviteFriendDialog";
 
 interface SearchResult {
   id: string;
@@ -20,6 +21,7 @@ const SearchBar = () => {
   const { user, profile, signOut } = useAuth();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
@@ -146,6 +148,7 @@ const SearchBar = () => {
     { icon: MapPin, label: "Saved Addresses", action: () => navigate("/customer/profile?tab=addresses") },
     { icon: Heart, label: "Wishlist", action: () => navigate("/customer/profile?tab=wishlist") },
     { icon: Bell, label: "Notifications", action: () => navigate("/customer/profile?tab=notifications") },
+    { icon: UserPlus, label: "Invite a Friend", action: () => setInviteOpen(true) },
     { icon: Download, label: "Download App", action: () => setDownloadDialogOpen(true) },
   ];
 
@@ -298,6 +301,7 @@ const SearchBar = () => {
       {/* Portal-rendered dropdown */}
       {dropdownPortal}
       <DownloadAppDialog open={downloadDialogOpen} onOpenChange={setDownloadDialogOpen} />
+      <InviteFriendDialog open={inviteOpen} onOpenChange={setInviteOpen} />
     </div>
   );
 };
