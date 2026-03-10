@@ -164,8 +164,8 @@ const SellingPartnerDashboard = () => {
   };
 
   const fetchCategories = async () => {
-    const { data } = await supabase.from("categories").select("id, name, category_type, variation_type").eq("is_active", true).order("sort_order");
-    if (data) setCategories(data as Category[]);
+    const { data } = await supabase.from("categories").select("id, name, category_type, variation_type, margin_percentage").eq("is_active", true).order("sort_order");
+    if (data) setCategories(data as any[]);
   };
 
   const fetchOrders = async (_myProducts: SellerProduct[]) => {
