@@ -381,6 +381,19 @@ const ProductsPage = () => {
             <div className="flex items-center gap-2"><Switch checked={form.is_active} onCheckedChange={(v) => setForm({ ...form, is_active: v })} /><Label>Active</Label></div>
             <div className="flex items-center gap-2"><Switch checked={form.coming_soon} onCheckedChange={(v) => setForm({ ...form, coming_soon: v })} /><Label>Coming Soon</Label></div>
           </div>
+          {/* Featured Discount for admin own products */}
+          {form.section === "featured" && (
+            <div className="rounded-lg border border-yellow-200 bg-yellow-50 dark:border-yellow-900 dark:bg-yellow-900/20 p-3 space-y-2">
+              <Label className="text-sm font-medium flex items-center gap-2"><Star className="h-4 w-4 text-yellow-500" /> Featured Extra Discount</Label>
+              <div className="flex gap-2">
+                <select className="flex h-9 rounded-md border border-input bg-background px-2 py-1 text-sm w-32" value={form.featured_discount_type} onChange={e => setForm({ ...form, featured_discount_type: e.target.value })}>
+                  <option value="amount">₹ Amount</option>
+                  <option value="percentage">% Percentage</option>
+                </select>
+                <Input type="number" min="0" step="0.01" placeholder="Discount value" value={form.featured_discount_value} onChange={e => setForm({ ...form, featured_discount_value: +e.target.value })} className="flex-1" />
+              </div>
+            </div>
+          )}
           <div><Label>Wallet Points (earned by customer)</Label><Input type="number" value={form.wallet_points} onChange={(e) => setForm({ ...form, wallet_points: +e.target.value })} placeholder="0" /></div>
           {(() => {
             const selectedCat = categories.find(c => c.name === form.category);
