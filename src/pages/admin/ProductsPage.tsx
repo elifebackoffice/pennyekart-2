@@ -218,6 +218,8 @@ const ProductsPage = () => {
       image_url_3: p.image_url_3 ?? "", video_url: p.video_url ?? "",
       wallet_points: (p as any).wallet_points ?? 0,
       margin_percentage: p.margin_percentage ?? null,
+      featured_discount_type: (p as any).featured_discount_type ?? "amount",
+      featured_discount_value: (p as any).featured_discount_value ?? 0,
     });
     setSellerEditId(p.id);
     setSellerEditOpen(true);
