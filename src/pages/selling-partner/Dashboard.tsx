@@ -78,7 +78,7 @@ const emptyForm = {
   name: "", description: "", price: "", category: "", stock: "",
   area_godown_id: "", image_url: "", image_url_2: "", image_url_3: "",
   purchase_rate: "", mrp: "", discount_rate: "", is_featured: false, video_url: "",
-  wallet_points: "",
+  wallet_points: "", featured_discount_type: "amount" as string, featured_discount_value: "",
 };
 
 const SellingPartnerDashboard = () => {
