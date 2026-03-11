@@ -4,7 +4,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, MapPin, ShoppingCart, Wallet, TrendingUp, CalendarDays, UserCheck, UserX, Activity, Download, Clock, Zap, Search, Phone, Ban, CheckCircle, UserPlus } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Users, MapPin, ShoppingCart, Wallet, TrendingUp, CalendarDays, UserCheck, UserX, Activity, Download, Clock, Zap, Search, Phone, Ban, CheckCircle, UserPlus, Eye } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -65,7 +67,27 @@ const CustomerList = ({ customers, orderSummaries, walletSummaries, onRefresh }:
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>("all");
   const [inactivePeriod, setInactivePeriod] = useState<InactivePeriod>("30");
   const [searchHistories, setSearchHistories] = useState<Map<string, SearchHistorySummary>>(new Map());
+  const [searchDetailOpen, setSearchDetailOpen] = useState(false);
+  const [searchDetailUser, setSearchDetailUser] = useState<{ userId: string; name: string } | null>(null);
+  const [searchDetailData, setSearchDetailData] = useState<{ query: string; result_count: number | null; created_at: string }[]>([]);
+  const [searchDetailLoading, setSearchDetailLoading] = useState(false);
   const { toast } = useToast();
+
+  const openSearchDetail = async (userId: string, name: string) => {
+    setSearchDetailUser({ userId, name });
+    setSearchDetailOpen(true);
+    setSearchDetailLoading(true);
+    const { data } = await supabase
+      .from("customer_search_history")
+      .select("search_query, result_count, created_at")
+      .eq("customer_user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(100);
+    setSearchDetailData(
+      (data ?? []).map((d: any) => ({ query: d.search_query, result_count: d.result_count, created_at: d.created_at }))
+    );
+    setSearchDetailLoading(false);
+  };
 
   // Toggle customer block status
   const toggleBlock = async (userId: string, currentBlocked: boolean) => {
@@ -680,28 +702,19 @@ const CustomerList = ({ customers, orderSummaries, walletSummaries, onRefresh }:
                       </div>
                     ) : "—"}
                   </TableCell>
-                  <TableCell className="text-xs max-w-[180px]">
+                  <TableCell className="text-xs">
                     {sh ? (
-                      <div className="flex flex-col gap-0.5">
-                        <div className="flex items-center gap-1">
-                          <Search className="h-3 w-3 text-muted-foreground" />
-                          <Badge variant="secondary" className="text-[10px]">{sh.search_count} searches</Badge>
-                        </div>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {sh.recent_searches.slice(0, 3).map((s, idx) => (
-                            <Badge key={idx} variant="outline" className="text-[10px] truncate max-w-[60px]" title={s}>
-                              {s}
-                            </Badge>
-                          ))}
-                        </div>
-                        {sh.last_search_at && (
-                          <span className="text-[10px] text-muted-foreground mt-0.5">
-                            Last: {getRelativeTime(sh.last_search_at)}
-                          </span>
-                        )}
-                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 gap-1.5 text-xs px-2"
+                        onClick={() => openSearchDetail(c.user_id, c.full_name ?? "Unknown")}
+                      >
+                        <Eye className="h-3 w-3" />
+                        <Badge variant="secondary" className="text-[10px]">{sh.search_count}</Badge>
+                      </Button>
                     ) : (
-                      <span className="text-muted-foreground">No searches</span>
+                      <span className="text-muted-foreground">—</span>
                     )}
                   </TableCell>
                   <TableCell className="text-right">
@@ -728,6 +741,52 @@ const CustomerList = ({ customers, orderSummaries, walletSummaries, onRefresh }:
           </TableBody>
         </Table>
       </div>
+
+      {/* Search History Detail Dialog */}
+      <Dialog open={searchDetailOpen} onOpenChange={setSearchDetailOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Search className="h-4 w-4" />
+              Search History — {searchDetailUser?.name}
+            </DialogTitle>
+          </DialogHeader>
+          {searchDetailLoading ? (
+            <div className="text-center py-8 text-muted-foreground text-sm">Loading...</div>
+          ) : searchDetailData.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground text-sm">No search history found</div>
+          ) : (
+            <ScrollArea className="max-h-[400px]">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>#</TableHead>
+                    <TableHead>Search Query</TableHead>
+                    <TableHead className="text-center">Results</TableHead>
+                    <TableHead>Date & Time</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {searchDetailData.map((item, idx) => (
+                    <TableRow key={idx}>
+                      <TableCell className="text-muted-foreground text-xs">{idx + 1}</TableCell>
+                      <TableCell className="font-medium text-sm">{item.query}</TableCell>
+                      <TableCell className="text-center">
+                        {item.result_count != null ? (
+                          <Badge variant="outline" className="text-[10px]">{item.result_count}</Badge>
+                        ) : "—"}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                        {format(new Date(item.created_at), "dd MMM yyyy, HH:mm")}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </ScrollArea>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
