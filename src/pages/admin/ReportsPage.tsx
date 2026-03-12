@@ -982,6 +982,111 @@ const ReportsPage = () => {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* ── SEARCH ANALYTICS ── */}
+        <TabsContent value="search" className="space-y-6">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard label="Total Searches" value={String(searchAnalytics.totalSearches)} icon={Search} sub="all time filtered" />
+            <StatCard label="Unique Searchers" value={String(searchAnalytics.uniqueSearchers)} icon={Users} sub="distinct customers" />
+            <StatCard label="Zero-Result Searches" value={String(searchAnalytics.zeroResultTotal)} icon={AlertTriangle} sub={pct(searchAnalytics.zeroResultTotal, searchAnalytics.totalSearches) + " of searches"} color="text-destructive" />
+            <StatCard label="Avg Searches/User" value={searchAnalytics.uniqueSearchers > 0 ? (searchAnalytics.totalSearches / searchAnalytics.uniqueSearchers).toFixed(1) : "0"} icon={BarChart3} />
+          </div>
+
+          {/* Search Volume Chart */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Daily Search Volume</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {searchAnalytics.dailyVolume.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">No search data available</p>
+              ) : (
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={searchAnalytics.dailyVolume}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                    <XAxis dataKey="day" className="text-xs" />
+                    <YAxis className="text-xs" />
+                    <Tooltip />
+                    <Bar dataKey="searches" name="Searches" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </CardContent>
+          </Card>
+
+          <div className="grid gap-6 lg:grid-cols-2">
+            {/* Top Searches */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Top Searches</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {searchAnalytics.topSearches.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">No search data</p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>#</TableHead>
+                        <TableHead>Search Query</TableHead>
+                        <TableHead className="text-right">Count</TableHead>
+                        <TableHead className="text-right">Avg Results</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {searchAnalytics.topSearches.map((s, i) => (
+                        <TableRow key={s.query}>
+                          <TableCell className="text-muted-foreground">{i + 1}</TableCell>
+                          <TableCell className="font-medium">{s.query}</TableCell>
+                          <TableCell className="text-right">{s.count}</TableCell>
+                          <TableCell className="text-right">
+                            <Badge variant={s.avgResults === 0 ? "destructive" : "secondary"}>{s.avgResults}</Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Zero-Result Searches */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-destructive" />
+                  Zero-Result Searches
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {searchAnalytics.zeroResultSearches.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">No zero-result searches found 🎉</p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>#</TableHead>
+                        <TableHead>Search Query</TableHead>
+                        <TableHead className="text-right">Times</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {searchAnalytics.zeroResultSearches.map((s, i) => (
+                        <TableRow key={s.query}>
+                          <TableCell className="text-muted-foreground">{i + 1}</TableCell>
+                          <TableCell className="font-medium">{s.query}</TableCell>
+                          <TableCell className="text-right">
+                            <Badge variant="destructive">{s.count}</Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
       </Tabs>
     </AdminLayout>
   );
