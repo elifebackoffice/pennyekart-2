@@ -323,7 +323,52 @@ const ReportsPage = () => {
   });
   const catData = Object.values(catMap).sort((a, b) => b.revenue - a.revenue).slice(0, 6);
 
-  if (loading) {
+  // ─── Search Analytics ────────────────────────────────────────────────────
+  const filteredSearchHistory = useMemo(() => {
+    if (!dateFrom || !dateTo) return searchHistory;
+    return searchHistory.filter(s => {
+      const d = new Date(s.created_at);
+      return isWithinInterval(d, { start: startOfDay(dateFrom), end: endOfDay(dateTo) });
+    });
+  }, [searchHistory, dateFrom, dateTo]);
+
+  const searchAnalytics = useMemo(() => {
+    const queryCount: Record<string, { count: number; totalResults: number; zeroCount: number }> = {};
+    filteredSearchHistory.forEach(s => {
+      const q = s.search_query.toLowerCase().trim();
+      if (!queryCount[q]) queryCount[q] = { count: 0, totalResults: 0, zeroCount: 0 };
+      queryCount[q].count++;
+      queryCount[q].totalResults += s.result_count ?? 0;
+      if ((s.result_count ?? 0) === 0) queryCount[q].zeroCount++;
+    });
+
+    const topSearches = Object.entries(queryCount)
+      .map(([query, v]) => ({ query, count: v.count, avgResults: v.count > 0 ? Math.round(v.totalResults / v.count) : 0 }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 20);
+
+    const zeroResultSearches = Object.entries(queryCount)
+      .filter(([, v]) => v.zeroCount > 0)
+      .map(([query, v]) => ({ query, count: v.zeroCount }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 15);
+
+    // Daily search volume (last 30 entries)
+    const dailyMap: Record<string, number> = {};
+    filteredSearchHistory.forEach(s => {
+      const day = format(new Date(s.created_at), "dd MMM");
+      dailyMap[day] = (dailyMap[day] || 0) + 1;
+    });
+    const dailyVolume = Object.entries(dailyMap).slice(-30).map(([day, searches]) => ({ day, searches }));
+
+    const uniqueSearchers = new Set(filteredSearchHistory.map(s => s.customer_user_id)).size;
+    const totalSearches = filteredSearchHistory.length;
+    const zeroResultTotal = filteredSearchHistory.filter(s => (s.result_count ?? 0) === 0).length;
+
+    return { topSearches, zeroResultSearches, dailyVolume, uniqueSearchers, totalSearches, zeroResultTotal };
+  }, [filteredSearchHistory]);
+
+
     return (
       <AdminLayout>
         <div className="flex items-center justify-center h-64">
