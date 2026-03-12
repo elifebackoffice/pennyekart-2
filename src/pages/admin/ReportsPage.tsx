@@ -368,7 +368,7 @@ const ReportsPage = () => {
     return { topSearches, zeroResultSearches, dailyVolume, uniqueSearchers, totalSearches, zeroResultTotal };
   }, [filteredSearchHistory]);
 
-
+  if (loading) {
     return (
       <AdminLayout>
         <div className="flex items-center justify-center h-64">
