@@ -80,7 +80,7 @@ export const useDeliveryCharge = (
 
     // 2. Category-wise charges
     const categoryRules = rules.filter(r => r.rule_type === "category");
-    const itemCategories = new Set(items.map(i => (i as any).category).filter(Boolean));
+    const itemCategories = new Set(items.map(i => i.category).filter(Boolean));
     
     // Track which categories already have charges applied
     const chargedCategories = new Set<string>();
