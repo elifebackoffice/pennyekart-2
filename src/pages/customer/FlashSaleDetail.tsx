@@ -158,6 +158,7 @@ const FlashSaleDetail = () => {
       price: item.flash_price,
       mrp: item.flash_mrp,
       image: item.product_image || "",
+      category: item.product_category || undefined,
       source: item.source,
     });
     toast({ title: "Added to cart", description: `${item.product_name} added at flash sale price!` });
