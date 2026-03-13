@@ -335,7 +335,8 @@ const Cart = () => {
         ordersToInsert.push({
           user_id: user!.id,
           items: mapOrderItems(microItems),
-          total: microTotal,
+          total: microTotal + deliveryCharge,
+          delivery_charge: deliveryCharge,
           status: "pending",
           shipping_address: deliveryAddress,
         });
