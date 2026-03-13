@@ -86,7 +86,7 @@ const PennyPrime = () => {
 
     const productIds = [...new Set(rawCoupons.map(c => c.product_id).filter(Boolean))];
     const { data: sellerProds } = productIds.length > 0
-      ? await supabase.from("seller_products").select("id, name, price, mrp, image_url, description").in("id", productIds)
+      ? await supabase.from("seller_products").select("id, name, price, mrp, image_url, description, category").in("id", productIds)
       : { data: [] };
     const { data: regularProds } = productIds.length > 0
       ? await supabase.from("products").select("id, name, price, mrp, image_url, description").in("id", productIds)
