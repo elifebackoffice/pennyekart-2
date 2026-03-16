@@ -715,6 +715,42 @@ export type Database = {
           },
         ]
       }
+      offer_flash_screens: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          image_url: string | null
+          is_active: boolean
+          link_url: string | null
+          sort_order: number
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean
+          link_url?: string | null
+          sort_order?: number
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean
+          link_url?: string | null
+          sort_order?: number
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       orders: {
         Row: {
           assigned_delivery_staff_id: string | null

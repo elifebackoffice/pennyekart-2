@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
 import { Star, TrendingUp, Sparkles, Wallet, Megaphone, X, Plus, Package, Wand2, MapPin, RotateCcw } from "lucide-react";
 import FlashSaleManager from "@/components/admin/FlashSaleManager";
+import FlashScreenManager from "@/components/admin/FlashScreenManager";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
@@ -439,7 +440,11 @@ const OffersPage = () => {
         </CardContent>
       </Card>
 
-      <FlashSaleManager />
+      <FlashScreenManager />
+
+      <div className="mt-6">
+        <FlashSaleManager />
+      </div>
 
       <div className="space-y-6 mt-6">
         {grouped.map((section) => {
