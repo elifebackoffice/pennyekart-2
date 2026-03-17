@@ -62,21 +62,26 @@ const OfferFlashPopup = () => {
     staleTime: 5 * 60 * 1000,
   });
 
+  // Pick a random starting screen
+  useEffect(() => {
+    if (screens.length > 0 && current === -1) {
+      setCurrent(Math.floor(Math.random() * screens.length));
+    }
+  }, [screens.length, current]);
+
   // Auto-show logic based on settings
   useEffect(() => {
-    if (screens.length === 0 || !popupSettings) return;
+    if (screens.length === 0 || !popupSettings || current === -1) return;
 
     const delaySec = popupSettings.open_delay_seconds;
 
     if (popupSettings.open_trigger === "countdown") {
-      // Show countdown first, then open
       setCountdown(delaySec);
     } else {
-      // refresh mode: just delay then open
       const timer = setTimeout(() => setOpen(true), delaySec * 1000);
       return () => clearTimeout(timer);
     }
-  }, [screens.length, popupSettings]);
+  }, [screens.length, popupSettings, current]);
 
   // Countdown ticker
   useEffect(() => {
