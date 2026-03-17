@@ -25,11 +25,25 @@ interface FlashScreen {
 
 const emptyForm = { title: "", image_url: "", link_url: "", is_active: true, sort_order: 0 };
 
+interface PopupSettings {
+  open_trigger: "refresh" | "countdown";
+  open_delay_seconds: number;
+  auto_disappear_seconds: number;
+}
+
+const defaultSettings: PopupSettings = {
+  open_trigger: "refresh",
+  open_delay_seconds: 2,
+  auto_disappear_seconds: 0, // 0 = no auto disappear
+};
+
 const FlashScreenManager = () => {
   const [items, setItems] = useState<FlashScreen[]>([]);
   const [form, setForm] = useState(emptyForm);
   const [editId, setEditId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const [settings, setSettings] = useState<PopupSettings>(defaultSettings);
+  const [savingSettings, setSavingSettings] = useState(false);
   const { hasPermission } = usePermissions();
   const { user } = useAuth();
   const { toast } = useToast();
