@@ -28,6 +28,7 @@ const fetchSectionProducts = async (): Promise<SectionProduct[]> => {
     .from("products")
     .select("id, name, price, mrp, discount_rate, image_url, category, section, coming_soon, wallet_points")
     .eq("is_active", true)
+    .eq("coming_soon", false)
     .not("section", "is", null)
     .neq("section", "")
     .limit(50);
