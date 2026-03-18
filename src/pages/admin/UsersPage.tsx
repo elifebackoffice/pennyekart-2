@@ -8,10 +8,14 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
 import CustomerList from "@/components/admin/CustomerList";
-import { Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 interface Profile {
   id: string;
@@ -71,6 +75,15 @@ const UsersPage = () => {
   const [orderSummaries, setOrderSummaries] = useState<Map<string, { user_id: string; order_count: number; total_spent: number; last_order_date: string | null }>>(new Map());
   const [walletSummaries, setWalletSummaries] = useState<Map<string, { user_id: string; balance: number }>>(new Map());
 
+  // Edit dialog state
+  const [editUser, setEditUser] = useState<Profile | null>(null);
+  const [editForm, setEditForm] = useState({ full_name: "", email: "", mobile_number: "" });
+  const [editSaving, setEditSaving] = useState(false);
+
+  // Delete dialog state
+  const [deleteUser, setDeleteUser] = useState<Profile | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
   const fetchData = async () => {
     const [usersRes, rolesRes, localBodiesRes, districtsRes, ordersRes, walletsRes] = await Promise.all([
       supabase.from("profiles").select("*"),
@@ -86,7 +99,6 @@ const UsersPage = () => {
 
     const allProfiles = (usersRes.data ?? []) as unknown as Profile[];
     
-    // Build a map of profile id -> mobile_number for referrer lookups
     const profileIdToMobile = new Map<string, string>();
     allProfiles.forEach((p) => {
       if (p.id && p.mobile_number) profileIdToMobile.set(p.id, p.mobile_number);
@@ -109,7 +121,6 @@ const UsersPage = () => {
       return enriched;
     });
 
-    // Build order summaries per user
     const oMap = new Map<string, { user_id: string; order_count: number; total_spent: number; last_order_date: string | null }>();
     (ordersRes.data ?? []).forEach((o: any) => {
       if (!o.user_id) return;
@@ -129,7 +140,6 @@ const UsersPage = () => {
     });
     setOrderSummaries(oMap);
 
-    // Build wallet summaries
     const wMap = new Map<string, { user_id: string; balance: number }>();
     (walletsRes.data ?? []).forEach((w: any) => {
       wMap.set(w.customer_user_id, { user_id: w.customer_user_id, balance: Number(w.balance ?? 0) });
@@ -160,7 +170,6 @@ const UsersPage = () => {
     return result;
   }, [users, filterType, filterRole, searchQuery]);
 
-  // Reset page when filters change
   useMemo(() => { setCurrentPage(1); }, [filterType, filterRole, searchQuery]);
 
   const isCustomerTab = filterType === "customer";
@@ -185,6 +194,47 @@ const UsersPage = () => {
     else { toast({ title: !current ? "User approved" : "User unapproved" }); fetchData(); }
   };
 
+  const openEditDialog = (user: Profile) => {
+    setEditUser(user);
+    setEditForm({
+      full_name: user.full_name ?? "",
+      email: user.email ?? "",
+      mobile_number: user.mobile_number ?? "",
+    });
+  };
+
+  const handleEditSave = async () => {
+    if (!editUser) return;
+    setEditSaving(true);
+    const { error } = await supabase.from("profiles").update({
+      full_name: editForm.full_name || null,
+      email: editForm.email || null,
+      mobile_number: editForm.mobile_number || null,
+    }).eq("user_id", editUser.user_id);
+    setEditSaving(false);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "User updated" });
+      setEditUser(null);
+      fetchData();
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteUser) return;
+    setDeleting(true);
+    const { error } = await supabase.from("profiles").delete().eq("user_id", deleteUser.user_id);
+    setDeleting(false);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "User deleted" });
+      setDeleteUser(null);
+      fetchData();
+    }
+  };
+
   const getTypeBadgeVariant = (type: string) => {
     switch (type) {
       case "delivery_staff": return "default";
@@ -193,8 +243,7 @@ const UsersPage = () => {
     }
   };
 
-  const customerColSpan = isSuperAdmin ? 8 : 7;
-  const otherColSpan = isSuperAdmin ? 6 : 5;
+  const otherColSpan = isSuperAdmin ? 7 : 6;
 
   return (
     <AdminLayout>
@@ -251,6 +300,7 @@ const UsersPage = () => {
                   <TableHead>Approved</TableHead>
                   <TableHead>Role</TableHead>
                   {isSuperAdmin && <TableHead>Super Admin</TableHead>}
+                  <TableHead className="w-12">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -287,6 +337,25 @@ const UsersPage = () => {
                         <Switch checked={u.is_super_admin} onCheckedChange={() => toggleSuperAdmin(u.user_id, u.is_super_admin)} />
                       </TableCell>
                     )}
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => openEditDialog(u)}>
+                            <Pencil className="h-4 w-4 mr-2" /> Edit
+                          </DropdownMenuItem>
+                          {isSuperAdmin && (
+                            <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setDeleteUser(u)}>
+                              <Trash2 className="h-4 w-4 mr-2" /> Delete
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
                   </TableRow>
                 ))}
                 {filteredUsers.length === 0 && (
@@ -337,6 +406,53 @@ const UsersPage = () => {
           )}
         </>
       )}
+
+      {/* Edit User Dialog */}
+      <Dialog open={!!editUser} onOpenChange={(open) => !open && setEditUser(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit User</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Full Name</Label>
+              <Input value={editForm.full_name} onChange={(e) => setEditForm(f => ({ ...f, full_name: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <Input type="email" value={editForm.email} onChange={(e) => setEditForm(f => ({ ...f, email: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>Mobile Number</Label>
+              <Input value={editForm.mobile_number} onChange={(e) => setEditForm(f => ({ ...f, mobile_number: e.target.value }))} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditUser(null)}>Cancel</Button>
+            <Button onClick={handleEditSave} disabled={editSaving}>
+              {editSaving ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!deleteUser} onOpenChange={(open) => !open && setDeleteUser(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete User</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>{deleteUser?.full_name ?? deleteUser?.email ?? "this user"}</strong>? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} disabled={deleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {deleting ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AdminLayout>
   );
 };
