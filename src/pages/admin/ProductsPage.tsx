@@ -183,7 +183,7 @@ const ProductsPage = () => {
   const handleCategoryChange = (categoryName: string, currentForm: typeof form, setFormFn: typeof setForm) => {
     const categoryMargin = getCategoryMargin(categoryName);
     const effectiveMargin = currentForm.margin_percentage ?? categoryMargin;
-    const newPrice = currentForm.purchase_rate > 0 ? calculateSellingPrice(currentForm.purchase_rate, effectiveMargin, currentForm.round_off_price) : currentForm.price;
+    const newPrice = currentForm.purchase_rate > 0 ? calculateSellingPrice(currentForm.purchase_rate, effectiveMargin, currentForm.round_off_price, currentForm.manual_round_off) : currentForm.price;
     const newDiscount = calculateDiscount(currentForm.mrp, newPrice);
     setFormFn({ ...currentForm, category: categoryName, price: newPrice, discount_rate: newDiscount });
   };
