@@ -318,11 +318,12 @@ const SellingPartnerDashboard = () => {
     return (cat as any)?.margin_percentage ?? 0;
   };
 
-  const calcPriceFromMargin = (purchaseRate: number, mrp: number, categoryName: string) => {
+  const calcPriceFromMargin = (purchaseRate: number, mrp: number, categoryName: string, roundOff = true) => {
     const margin = getCategoryMargin(categoryName);
-    const price = purchaseRate > 0 && margin > 0
-      ? Math.round(purchaseRate * (1 + margin / 100) * 100) / 100
+    const raw = purchaseRate > 0 && margin > 0
+      ? purchaseRate * (1 + margin / 100)
       : mrp;
+    const price = roundOff ? Math.round(raw) : Math.round(raw * 100) / 100;
     const discount = Math.max(0, mrp - price);
     return { price, discount };
   };
