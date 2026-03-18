@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Minus, Plus, Trash2, ShieldCheck, Clock, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/hooks/useCart";
@@ -17,6 +17,7 @@ import { useDeliveryCharge } from "@/hooks/useDeliveryCharge";
 
 const Cart = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { items, updateQuantity, removeItem, clearCart, totalPrice, totalItems } = useCart();
   const { user } = useAuth();
   const [showPayment, setShowPayment] = useState(false);
@@ -79,6 +80,9 @@ const Cart = () => {
         });
     }
   }, [user]);
+
+  // Auto-apply coupon from URL param (e.g. /cart?coupon=CODE)
+  const couponFromUrl = useRef(searchParams.get("coupon")?.toUpperCase() || "");
 
   const totalMrp = items.reduce((s, i) => s + Math.max(i.mrp, i.price) * i.quantity, 0);
   const totalDiscount = totalMrp - totalPrice;
@@ -152,6 +156,46 @@ const Cart = () => {
       setCouponLoading(false);
     }
   };
+
+  // Auto-apply coupon from URL (e.g. /cart?coupon=CODE)
+  const urlCouponApplied = useRef(false);
+  useEffect(() => {
+    if (couponFromUrl.current && !urlCouponApplied.current && !appliedCoupon && items.length > 0) {
+      urlCouponApplied.current = true;
+      setCouponCode(couponFromUrl.current);
+      searchParams.delete("coupon");
+      setSearchParams(searchParams, { replace: true });
+      // Apply after state update
+      const code = couponFromUrl.current;
+      couponFromUrl.current = "";
+      (async () => {
+        setCouponLoading(true);
+        try {
+          const { data: collab } = await supabase
+            .from("penny_prime_collabs")
+            .select("id, collab_code, coupon_id")
+            .eq("collab_code", code)
+            .maybeSingle();
+          if (!collab) { setCouponError("Invalid or expired coupon code"); return; }
+          const { data: coupon } = await supabase
+            .from("penny_prime_coupons")
+            .select("customer_discount_type, customer_discount_value, is_active, product_id")
+            .eq("id", collab.coupon_id)
+            .maybeSingle();
+          if (!coupon || !coupon.is_active) { setCouponError("This coupon is no longer active"); return; }
+          const matchingItem = items.find(i => i.id === coupon.product_id);
+          if (!matchingItem) { setCouponError("This coupon is only valid for a specific product not in your cart"); return; }
+          const productTotal = matchingItem.price * matchingItem.quantity;
+          let discount = coupon.customer_discount_type === "amount"
+            ? coupon.customer_discount_value
+            : (productTotal * coupon.customer_discount_value) / 100;
+          discount = Math.min(discount, productTotal);
+          setAppliedCoupon({ code, discount, collabId: collab.id });
+        } catch { setCouponError("Failed to validate coupon"); }
+        finally { setCouponLoading(false); }
+      })();
+    }
+  }, [items, appliedCoupon]);
 
   const handleRemoveCoupon = () => {
     setAppliedCoupon(null);
