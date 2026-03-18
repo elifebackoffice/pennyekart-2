@@ -80,7 +80,7 @@ const Cart = () => {
     }
   }, [user]);
 
-  const totalMrp = items.reduce((s, i) => s + i.mrp * i.quantity, 0);
+  const totalMrp = items.reduce((s, i) => s + Math.max(i.mrp, i.price) * i.quantity, 0);
   const totalDiscount = totalMrp - totalPrice;
   const platformFee = items.length > 0 ? 7 : 0;
   const couponDiscount = appliedCoupon?.discount ?? 0;
@@ -513,13 +513,13 @@ const Cart = () => {
                         )}
                       </div>
                       <div className="mt-1 flex items-baseline gap-2">
-                        {item.mrp > item.price && (
-                          <span className="text-xs text-muted-foreground line-through">₹{item.mrp}</span>
+                        {Math.max(item.mrp, item.price) > item.price && (
+                          <span className="text-xs text-muted-foreground line-through">₹{Math.max(item.mrp, item.price)}</span>
                         )}
                         <span className="text-base font-bold text-foreground">₹{item.price}</span>
-                        {item.mrp > item.price && (
+                        {Math.max(item.mrp, item.price) > item.price && (
                           <span className="text-xs font-medium text-secondary">
-                            {Math.round(((item.mrp - item.price) / item.mrp) * 100)}% off
+                            {Math.round(((Math.max(item.mrp, item.price) - item.price) / Math.max(item.mrp, item.price)) * 100)}% off
                           </span>
                         )}
                       </div>
