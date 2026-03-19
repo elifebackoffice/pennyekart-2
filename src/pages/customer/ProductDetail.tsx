@@ -104,7 +104,8 @@ const ProductDetail = () => {
       source: productSource,
       seller_id: productSellerId,
     });
-    navigate("/cart");
+    const cartUrl = couponFromUrl ? `/cart?coupon=${encodeURIComponent(couponFromUrl)}` : "/cart";
+    navigate(cartUrl);
   };
 
   // Build slides: images + video
