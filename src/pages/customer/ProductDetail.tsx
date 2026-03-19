@@ -89,7 +89,12 @@ const ProductDetail = () => {
       source: productSource,
       seller_id: productSellerId,
     });
-    toast({ title: "Added to cart", description: `${product.name} added to your cart.` });
+    toast({
+      title: "Added to cart",
+      description: couponFromUrl
+        ? `${product.name} added. Coupon "${couponFromUrl}" will be auto-applied at checkout.`
+        : `${product.name} added to your cart.`,
+    });
   };
 
   const handleBuyNow = () => {
