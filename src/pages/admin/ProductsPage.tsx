@@ -583,6 +583,10 @@ const ProductsPage = () => {
                 <option value="">All Categories</option>
                 {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
               </select>
+              <select className="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm" value={sellerFilter} onChange={(e) => setSellerFilter(e.target.value)}>
+                <option value="">All Sellers</option>
+                {sellerProfiles.map(s => <option key={s.user_id} value={s.user_id}>{s.company_name || s.full_name || s.user_id.slice(0, 8)}</option>)}
+              </select>
               <p className="text-sm text-muted-foreground hidden sm:block">Approve to make visible to customers.</p>
             </div>
             <Button variant="outline" onClick={() => navigate("/selling-partner/dashboard")}>
