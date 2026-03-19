@@ -77,6 +77,7 @@ const ProductsPage = () => {
   const [sellerCategoryFilter, setSellerCategoryFilter] = useState("");
   const [ownSearch, setOwnSearch] = useState("");
   const [sellerSearch, setSellerSearch] = useState("");
+  const [sellerFilter, setSellerFilter] = useState("");
   const [detailProduct, setDetailProduct] = useState<(Product | SellerProduct) | null>(null);
   const [detailType, setDetailType] = useState<"own" | "seller">("own");
   const [detailSellerInfo, setDetailSellerInfo] = useState<{
