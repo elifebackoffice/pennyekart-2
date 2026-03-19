@@ -14,6 +14,7 @@ Deno.serve(async (req) => {
     const url = new URL(req.url);
     const productId = url.searchParams.get("id");
     const siteUrl = url.searchParams.get("site_url") || "https://pennyekart.com";
+    const coupon = url.searchParams.get("coupon");
 
     if (!productId) {
       return new Response("Missing product id", { status: 400 });
