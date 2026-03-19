@@ -117,7 +117,7 @@ const ImageUpload = ({ bucket, value, onChange, label, useExternalStorage = true
         if (!res.ok) {
           // Fallback to Supabase storage
           console.warn("External upload failed, falling back to Supabase storage:", data.error);
-          await fallbackToSupabase(file);
+        await fallbackToSupabase(optimizedFile);
           return;
         }
 
