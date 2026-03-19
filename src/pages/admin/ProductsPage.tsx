@@ -79,6 +79,17 @@ const ProductsPage = () => {
   const [sellerSearch, setSellerSearch] = useState("");
   const [detailProduct, setDetailProduct] = useState<(Product | SellerProduct) | null>(null);
   const [detailType, setDetailType] = useState<"own" | "seller">("own");
+  const [detailSellerInfo, setDetailSellerInfo] = useState<{
+    company_name: string | null;
+    business_address: string | null;
+    business_city: string | null;
+    business_state: string | null;
+    business_pincode: string | null;
+    business_phone: string | null;
+    business_email: string | null;
+    full_name: string | null;
+    gst_number: string | null;
+  } | null>(null);
   const { hasPermission } = usePermissions();
   const { user } = useAuth();
   const { toast } = useToast();
