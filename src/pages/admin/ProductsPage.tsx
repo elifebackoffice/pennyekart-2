@@ -616,7 +616,7 @@ const ProductsPage = () => {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
-                        <Button variant="ghost" size="sm" onClick={() => { setDetailProduct(p); setDetailType("seller"); }}><Eye className="h-3.5 w-3.5" /></Button>
+                        <Button variant="ghost" size="sm" onClick={async () => { setDetailProduct(p); setDetailType("seller"); const { data } = await supabase.from("profiles").select("company_name, business_address, business_city, business_state, business_pincode, business_phone, business_email, full_name, gst_number").eq("user_id", p.seller_id).single(); setDetailSellerInfo(data); }}><Eye className="h-3.5 w-3.5" /></Button>
                         <Button variant="ghost" size="sm" onClick={() => openSellerEdit(p)}>
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
