@@ -644,7 +644,7 @@ const ProductsPage = () => {
       </Tabs>
 
       {/* Product Detail Dialog */}
-      <Dialog open={!!detailProduct} onOpenChange={(v) => { if (!v) setDetailProduct(null); }}>
+      <Dialog open={!!detailProduct} onOpenChange={(v) => { if (!v) { setDetailProduct(null); setDetailSellerInfo(null); } }}>
         <DialogContent className="max-h-[85vh] flex flex-col max-w-[95vw] sm:max-w-lg">
           <DialogHeader><DialogTitle>Product Details</DialogTitle></DialogHeader>
           {detailProduct && (
