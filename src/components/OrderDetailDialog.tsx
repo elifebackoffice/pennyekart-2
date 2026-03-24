@@ -36,6 +36,26 @@ interface Props {
 const defaultStatusLabel = (s: string) => s.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
 
 const OrderDetailDialog = ({ order, open, onOpenChange, statusLabel = defaultStatusLabel }: Props) => {
+  const [customerLocation, setCustomerLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [loadingLocation, setLoadingLocation] = useState(false);
+
+  useEffect(() => {
+    setCustomerLocation(null);
+    if (!order?.user_id) return;
+    setLoadingLocation(true);
+    supabase
+      .from("profiles")
+      .select("latitude, longitude")
+      .eq("user_id", order.user_id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.latitude && data?.longitude) {
+          setCustomerLocation({ lat: data.latitude, lng: data.longitude });
+        }
+        setLoadingLocation(false);
+      });
+  }, [order?.user_id, open]);
+
   if (!order) return null;
 
   const items: OrderItem[] = Array.isArray(order.items) ? order.items : [];
