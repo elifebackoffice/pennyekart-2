@@ -91,9 +91,8 @@ const Cart = () => {
 
   const totalMrp = items.reduce((s, i) => s + Math.max(i.mrp, i.price) * i.quantity, 0);
   const totalDiscount = totalMrp - totalPrice;
-  const platformFee = items.length > 0 ? 7 : 0;
   const couponDiscount = appliedCoupon?.discount ?? 0;
-  const preDeliverySubtotal = totalPrice + platformFee - couponDiscount;
+  const preDeliverySubtotal = totalPrice - couponDiscount;
   
   const { totalCharge: deliveryCharge, isFreeDelivery, freeDeliveryThreshold, amountToFreeDelivery, breakdown: deliveryBreakdown } = useDeliveryCharge(items, totalPrice);
   
@@ -820,10 +819,6 @@ const Cart = () => {
                     <span className="font-medium text-secondary">− ₹{totalDiscount.toFixed(2)}</span>
                   </div>
                 )}
-                <div className="flex justify-between">
-                  <span className="text-foreground">Platform Fee</span>
-                  <span className="text-foreground">₹{platformFee}</span>
-                </div>
                 <div className="flex justify-between">
                   <span className="text-foreground">Delivery Charges</span>
                   {isFreeDelivery ? (
