@@ -15,9 +15,6 @@ interface FlashScreenItem {
   content_text: string | null;
   gradient_from: string | null;
   gradient_to: string | null;
-}
-
-interface PopupSettings {
   open_trigger: string;
   open_delay_seconds: number;
   auto_disappear_seconds: number;
@@ -27,25 +24,10 @@ interface PopupSettings {
 const fetchFlashScreens = async (): Promise<FlashScreenItem[]> => {
   const { data } = await supabase
     .from("offer_flash_screens" as any)
-    .select("id, title, image_url, link_url, sort_order, content_text, gradient_from, gradient_to")
+    .select("id, title, image_url, link_url, sort_order, content_text, gradient_from, gradient_to, open_trigger, open_delay_seconds, auto_disappear_seconds, target_audience")
     .eq("is_active", true)
     .order("sort_order");
   return (data as any as FlashScreenItem[]) ?? [];
-};
-
-const fetchPopupSettings = async (): Promise<PopupSettings> => {
-  const { data } = await supabase
-    .from("app_settings")
-    .select("key, value")
-    .in("key", ["flash_popup_open_trigger", "flash_popup_open_delay", "flash_popup_auto_disappear", "flash_popup_target_audience"]);
-  const map: Record<string, string> = {};
-  (data ?? []).forEach((r) => { if (r.value) map[r.key] = r.value; });
-  return {
-    open_trigger: map["flash_popup_open_trigger"] || "refresh",
-    open_delay_seconds: parseInt(map["flash_popup_open_delay"] || "2") || 2,
-    auto_disappear_seconds: parseInt(map["flash_popup_auto_disappear"] || "0"),
-    target_audience: map["flash_popup_target_audience"] || "all",
-  };
 };
 
 const OfferFlashPopup = () => {
@@ -63,35 +45,34 @@ const OfferFlashPopup = () => {
     gcTime: 10 * 60 * 1000,
   });
 
-  const { data: popupSettings } = useQuery({
-    queryKey: ["flash-popup-settings"],
-    queryFn: fetchPopupSettings,
-    staleTime: 5 * 60 * 1000,
+  // Filter screens based on per-screen target_audience
+  const eligibleScreens = screens.filter((s) => {
+    if (s.target_audience === "unlogged" && user) return false;
+    return true;
   });
 
-  // Pick a random starting screen
+  // Pick a random starting screen from eligible ones
   useEffect(() => {
-    if (screens.length > 0 && current === -1) {
-      setCurrent(Math.floor(Math.random() * screens.length));
+    if (eligibleScreens.length > 0 && current === -1) {
+      setCurrent(Math.floor(Math.random() * eligibleScreens.length));
     }
-  }, [screens.length, current]);
+  }, [eligibleScreens.length, current]);
 
-  // Auto-show logic based on settings & target audience
+  const screen = current >= 0 && current < eligibleScreens.length ? eligibleScreens[current] : null;
+
+  // Auto-show logic based on current screen's settings
   useEffect(() => {
-    if (screens.length === 0 || !popupSettings || current === -1) return;
+    if (!screen || open) return;
 
-    // Check target audience
-    if (popupSettings.target_audience === "unlogged" && user) return;
+    const delaySec = screen.open_delay_seconds ?? 2;
 
-    const delaySec = popupSettings.open_delay_seconds;
-
-    if (popupSettings.open_trigger === "countdown") {
+    if (screen.open_trigger === "countdown") {
       setCountdown(delaySec);
     } else {
       const timer = setTimeout(() => setOpen(true), delaySec * 1000);
       return () => clearTimeout(timer);
     }
-  }, [screens.length, popupSettings, current, user]);
+  }, [screen?.id, open]);
 
   // Countdown ticker
   useEffect(() => {
@@ -106,16 +87,16 @@ const OfferFlashPopup = () => {
     return () => clearTimeout(id);
   }, [countdown]);
 
-  // Auto-disappear when popup opens
+  // Auto-disappear based on current screen's settings
   useEffect(() => {
-    if (!open || !popupSettings || popupSettings.auto_disappear_seconds <= 0) return;
+    if (!open || !screen || (screen.auto_disappear_seconds ?? 0) <= 0) return;
     autoCloseRef.current = setTimeout(() => {
       setOpen(false);
-    }, popupSettings.auto_disappear_seconds * 1000);
+    }, screen.auto_disappear_seconds * 1000);
     return () => {
       if (autoCloseRef.current) clearTimeout(autoCloseRef.current);
     };
-  }, [open, popupSettings]);
+  }, [open, screen?.id]);
 
   const handleClick = (linkUrl: string | null) => {
     if (linkUrl) {
@@ -128,12 +109,12 @@ const OfferFlashPopup = () => {
     }
   };
 
-  if (screens.length === 0 || current === -1) return null;
+  if (eligibleScreens.length === 0 || !screen) return null;
 
-  const screen = screens[current];
-  const hasMultiple = screens.length > 1;
+  const hasMultiple = eligibleScreens.length > 1;
   const gradFrom = screen.gradient_from || '#6366f1';
   const gradTo = screen.gradient_to || '#8b5cf6';
+  const autoDisappear = screen.auto_disappear_seconds ?? 0;
 
   return (
     <>
@@ -147,7 +128,7 @@ const OfferFlashPopup = () => {
       {/* Floating button to reopen */}
       {!open && countdown === null && (
         <button
-          onClick={() => { setCurrent(Math.floor(Math.random() * screens.length)); setOpen(true); }}
+          onClick={() => { setCurrent(Math.floor(Math.random() * eligibleScreens.length)); setOpen(true); }}
           className="fixed bottom-20 right-3 z-50 md:bottom-6 md:right-6 flex items-center justify-center h-12 w-12 rounded-full bg-primary text-primary-foreground shadow-lg animate-bounce hover:animate-none transition-all"
           aria-label="View offers"
         >
@@ -167,13 +148,11 @@ const OfferFlashPopup = () => {
             </button>
 
             {/* Auto-disappear progress bar */}
-            {popupSettings && popupSettings.auto_disappear_seconds > 0 && open && (
+            {autoDisappear > 0 && open && (
               <div className="absolute top-0 left-0 right-0 z-10 h-1 rounded-t-xl overflow-hidden bg-black/20">
                 <div
                   className="h-full bg-white/80 rounded-t-xl"
-                  style={{
-                    animation: `shrink ${popupSettings.auto_disappear_seconds}s linear forwards`,
-                  }}
+                  style={{ animation: `shrink ${autoDisappear}s linear forwards` }}
                 />
                 <style>{`@keyframes shrink { from { width: 100%; } to { width: 0%; } }`}</style>
               </div>
@@ -210,13 +189,13 @@ const OfferFlashPopup = () => {
             {hasMultiple && (
               <>
                 <button
-                  onClick={() => setCurrent((c) => (c - 1 + screens.length) % screens.length)}
+                  onClick={() => setCurrent((c) => (c - 1 + eligibleScreens.length) % eligibleScreens.length)}
                   className="absolute left-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70"
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </button>
                 <button
-                  onClick={() => setCurrent((c) => (c + 1) % screens.length)}
+                  onClick={() => setCurrent((c) => (c + 1) % eligibleScreens.length)}
                   className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70"
                 >
                   <ChevronRight className="h-4 w-4" />
@@ -227,7 +206,7 @@ const OfferFlashPopup = () => {
             {/* Dots */}
             {hasMultiple && (
               <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
-                {screens.map((_, i) => (
+                {eligibleScreens.map((_, i) => (
                   <button
                     key={i}
                     onClick={() => setCurrent(i)}
