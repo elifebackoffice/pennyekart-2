@@ -717,6 +717,7 @@ export type Database = {
       }
       offer_flash_screens: {
         Row: {
+          auto_disappear_seconds: number | null
           content_text: string | null
           created_at: string
           created_by: string | null
@@ -726,11 +727,15 @@ export type Database = {
           image_url: string | null
           is_active: boolean
           link_url: string | null
+          open_delay_seconds: number | null
+          open_trigger: string | null
           sort_order: number
+          target_audience: string | null
           title: string
           updated_at: string
         }
         Insert: {
+          auto_disappear_seconds?: number | null
           content_text?: string | null
           created_at?: string
           created_by?: string | null
@@ -740,11 +745,15 @@ export type Database = {
           image_url?: string | null
           is_active?: boolean
           link_url?: string | null
+          open_delay_seconds?: number | null
+          open_trigger?: string | null
           sort_order?: number
+          target_audience?: string | null
           title: string
           updated_at?: string
         }
         Update: {
+          auto_disappear_seconds?: number | null
           content_text?: string | null
           created_at?: string
           created_by?: string | null
@@ -754,7 +763,10 @@ export type Database = {
           image_url?: string | null
           is_active?: boolean
           link_url?: string | null
+          open_delay_seconds?: number | null
+          open_trigger?: string | null
           sort_order?: number
+          target_audience?: string | null
           title?: string
           updated_at?: string
         }
