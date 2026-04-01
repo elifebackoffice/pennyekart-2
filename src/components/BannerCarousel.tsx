@@ -25,7 +25,7 @@ const fetchBanners = async () => {
       link: b.link_url || "",
     }));
   }
-  return fallbackBanners;
+  return [];
 };
 
 const BannerCarousel = () => {
