@@ -91,8 +91,7 @@ const AppSettingsPage = () => {
     try {
       const { error } = await supabase
         .from("app_settings")
-        .update({ value: carbsUrl.trim() })
-        .eq("key", "pennycarbs_url");
+        .upsert({ key: "pennycarbs_url", value: carbsUrl.trim(), description: "Penny Carbs food delivery URL" }, { onConflict: "key" });
 
       if (error) throw error;
 
