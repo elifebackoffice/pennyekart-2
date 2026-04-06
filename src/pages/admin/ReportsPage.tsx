@@ -413,13 +413,13 @@ const ReportsPage = () => {
       else status = "inactive";
 
       // If joined within 7 days and no orders, mark as new
-      const joinedDaysAgo = differenceInDays(now, new Date((c as any).created_at || now));
+      const joinedDaysAgo = differenceInDays(now, new Date(c.created_at || now));
       if (orderCount === 0 && joinedDaysAgo <= 7) status = "new";
 
       return {
         userId: c.user_id,
         name: c.full_name || "Unknown",
-        mobile: (c as any).mobile_number || null,
+        mobile: c.mobile_number || null,
         localBodyId: c.local_body_id,
         wardNumber: c.ward_number,
         status,
@@ -428,7 +428,7 @@ const ReportsPage = () => {
         lastOrderDate,
         firstOrderDate,
         daysSinceLastOrder,
-        joinedAt: (c as any).created_at || "",
+        joinedAt: c.created_at || "",
       };
     });
 
