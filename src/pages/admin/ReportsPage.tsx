@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { format, subDays, subMonths, startOfDay, endOfDay, isWithinInterval } from "date-fns";
+import { format, subDays, subMonths, startOfDay, endOfDay, isWithinInterval, differenceInDays } from "date-fns";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown, CalendarIcon, Filter } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
