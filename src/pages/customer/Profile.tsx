@@ -310,6 +310,9 @@ const Profile = () => {
                 </div>
                 <div className="flex-1">
                   <p className="font-semibold text-lg">{profile?.full_name || "Customer"}</p>
+                  {profile?.customer_id && (
+                    <p className="text-xs font-mono text-primary font-semibold">{profile.customer_id}</p>
+                  )}
                   <p className="text-sm text-muted-foreground flex items-center gap-1"><Mail className="h-3 w-3" /> {user.email}</p>
                   {profile?.mobile_number && (
                     <p className="text-sm text-muted-foreground flex items-center gap-1"><Phone className="h-3 w-3" /> {profile.mobile_number}</p>
