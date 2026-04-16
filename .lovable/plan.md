@@ -1,55 +1,62 @@
 
 
-# AI Chatbot with Voice Support
+## Chatbot Admin Control and Service Integration
 
-## What We're Building
+### Overview
+Add a full admin control panel for the Penny chatbot, allowing admins to configure the bot's behavior, add custom knowledge/context about external services, and manage API keys — all stored in the database and dynamically loaded by the edge function.
 
-A floating chat bubble (bottom-right corner) that opens a conversational AI assistant. The bot helps customers with shopping queries (find products, check availability) and customer support (order tracking, returns, delivery questions). Users can tap a mic button to speak their message instead of typing — speech is converted to text, and the AI responds in text with streaming.
+### Database Changes (Migration)
 
-## Architecture
+**New table: `chatbot_config`**
+- `id`, `key` (unique), `value` (text), `updated_at`, `updated_by`
+- Keys: `system_prompt`, `welcome_message`, `enabled`, `bot_name`, `response_language`, `max_history_messages`
 
-```text
-┌─────────────────────┐       ┌──────────────────────┐
-│  React Frontend     │       │  Edge Function: chat  │
-│                     │       │                       │
-│  FloatingChatBot    │──SSE──│  Lovable AI Gateway   │
-│  + Web Speech API   │       │  (gemini-3-flash)     │
-│  (mic → text)       │       │  System prompt with   │
-│                     │       │  store context         │
-└─────────────────────┘       └──────────────────────┘
-```
+**New table: `chatbot_knowledge`**
+- `id`, `title`, `content` (text — service details, FAQs, product info, URLs), `is_active`, `sort_order`, `created_at`, `updated_at`
+- Admins add entries like "Penny Carbs Details", "Return Policy", "Delivery Areas", external site URLs/descriptions
+- These get injected into the system prompt dynamically
 
-- **Voice input**: Browser's built-in Web Speech API (`webkitSpeechRecognition`) — no extra dependencies or API keys needed
-- **AI backend**: Supabase Edge Function calling Lovable AI Gateway with `LOVABLE_API_KEY` (already available)
-- **Streaming**: SSE token-by-token rendering for fast responses
+**New table: `chatbot_api_keys`**
+- `id`, `service_name`, `api_key` (encrypted text), `base_url`, `description`, `is_active`, `created_at`
+- For storing external service API keys (e.g., delivery tracking API, payment gateway info)
+- The edge function reads active keys and can use them for external calls
 
-## Implementation Steps
+**RLS**: All three tables restricted to super_admin / users with admin permissions.
 
-### 1. Create Edge Function `supabase/functions/chat/index.ts`
-- Accept `{ messages }` array from client
-- Inject a system prompt tailored to Pennyekart (shopping assistant + customer support context)
-- Stream response from Lovable AI Gateway (`google/gemini-3-flash-preview`)
-- Handle CORS, 429/402 error codes
+### Admin UI — New Chatbot Settings Page
 
-### 2. Update `supabase/config.toml`
-- Add `[functions.chat]` with `verify_jwt = false`
+**File: `src/pages/admin/ChatbotSettingsPage.tsx`**
 
-### 3. Create `src/components/ChatBot.tsx`
-- Floating bubble icon (bottom-right, above mobile nav)
-- Expandable chat window with message list and input
-- Markdown rendering for AI responses (`react-markdown`)
-- Streaming integration using SSE parsing
-- Mic button using Web Speech API for speech-to-text
-- Visual indicator when listening (pulsing mic icon)
-- Error handling with toast notifications for rate limits
+Three tabs:
 
-### 4. Add ChatBot to `src/App.tsx`
-- Render `<ChatBot />` globally inside the router, visible on all pages
+1. **General Settings** — Toggle chatbot on/off, edit bot name, welcome message, response language (Malayalam/English/Auto), max history messages
+2. **Knowledge Base** — CRUD list of knowledge entries (title + content textarea). Each entry's content gets appended to the system prompt. Add/edit/delete with confirmation dialogs.
+3. **External Services** — Add external service API keys with name, base URL, description. Show masked keys. Edit/delete with confirmation.
 
-### Technical Details
+Add route `/admin/chatbot` and sidebar link in AdminLayout.
 
-- **No new dependencies needed** except `react-markdown` (for rendering AI responses)
-- **Web Speech API** works in Chrome, Edge, Safari — fallback hides mic button on unsupported browsers
-- **System prompt** will reference Pennyekart brand, product categories, order help, and wallet features
-- Uses earth-tone styling consistent with brand (amber accents, DM Sans font)
+### Edge Function Update — `supabase/functions/chat/index.ts`
+
+- On each request, fetch `chatbot_config` and active `chatbot_knowledge` entries from the database
+- Build the system prompt dynamically: base prompt from `system_prompt` config + all knowledge entries appended as context sections
+- Fetch active `chatbot_api_keys` — if external service calls are needed, the function has the keys available
+- Respect `enabled` flag — return a friendly message if chatbot is disabled
+- Cache config briefly (or fetch fresh each request since it's lightweight)
+
+### Frontend ChatBot Update — `src/components/ChatBot.tsx`
+
+- Fetch `chatbot_config` (enabled, bot_name, welcome_message) from `app_settings` or the new config table on mount
+- If disabled, hide the chat bubble entirely
+- Use dynamic bot name and welcome message from config
+
+### Files to Create/Edit
+
+| File | Action |
+|------|--------|
+| Migration SQL | Create `chatbot_config`, `chatbot_knowledge`, `chatbot_api_keys` tables with RLS |
+| `src/pages/admin/ChatbotSettingsPage.tsx` | New admin page with 3 tabs |
+| `src/components/admin/AdminLayout.tsx` | Add sidebar link for Chatbot Settings |
+| `src/App.tsx` | Add route `/admin/chatbot` |
+| `supabase/functions/chat/index.ts` | Dynamic prompt from DB, external service keys |
+| `src/components/ChatBot.tsx` | Load config (enabled, name, welcome message) |
 
