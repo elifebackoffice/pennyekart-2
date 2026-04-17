@@ -172,28 +172,38 @@ function normalizeMobile(raw: string): string {
   return s;
 }
 
-// Try a list of (table, columns) combos with `or(col.eq.value)` and return the first non-empty hit.
+// Try each candidate column individually so a missing column doesn't break the whole `or()`.
 async function findByMobile(
   elife: any,
   allowedTables: string[],
   mobile: string,
-  candidates: { table: string; cols: string[] }[],
+  candidates: { table: string; cols: string[]; jsonbPaths?: string[] }[],
   limit = 10,
-): Promise<{ source: string; rows: any[] } | null> {
+): Promise<{ source: string; rows: any[]; matched_column?: string } | null> {
   const variants = Array.from(new Set([mobile, `91${mobile}`, `+91${mobile}`, `0${mobile}`]));
   for (const c of candidates) {
     if (allowedTables.length && !allowedTables.includes(c.table)) continue;
-    const orParts: string[] = [];
+
+    // Try plain columns one at a time
     for (const col of c.cols) {
-      for (const v of variants) orParts.push(`${col}.eq.${v}`);
+      for (const v of variants) {
+        const { data, error } = await elife.from(c.table).select("*").eq(col, v).limit(limit);
+        if (error) {
+          // Column doesn't exist — try the next column variant
+          break;
+        }
+        if (data && data.length) return { source: c.table, rows: data, matched_column: col };
+      }
     }
-    const { data, error } = await elife.from(c.table).select("*").or(orParts.join(",")).limit(limit);
-    if (error) {
-      // Column mismatch / table missing — keep trying other tables
-      console.log(`findByMobile ${c.table} error:`, error.message);
-      continue;
+
+    // Try JSONB paths e.g. "answers->_fixed->>mobile"
+    for (const path of c.jsonbPaths || []) {
+      for (const v of variants) {
+        const { data, error } = await elife.from(c.table).select("*").eq(path, v).limit(limit);
+        if (error) break;
+        if (data && data.length) return { source: c.table, rows: data, matched_column: path };
+      }
     }
-    if (data && data.length) return { source: c.table, rows: data };
   }
   return null;
 }
