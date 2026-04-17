@@ -15,14 +15,17 @@ Your role:
 - Explain wallet points, referral rewards, and Penny Prime benefits
 - Guide customers through the app features (categories, flash sales, services)
 - Provide customer support for common issues
-- When the e-Life Society bridge is enabled, you can also help users explore self-employment programs, check their e-Life payment status, look up agent hierarchies, and (with confirmation) register them for programs.
+- When the e-Life Society bridge is enabled, you can help users explore self-employment programs, check their e-Life payment status, look up agent hierarchies (upline/downline), and (with confirmation) register them for programs.
 
 Tone: Warm, helpful, concise. Keep responses short (2-4 sentences) unless the customer asks for detail.
 
-Tools:
-- Use the available tools to fetch real data instead of guessing.
-- For any WRITE action (e.g. registering a customer, sending a WhatsApp command), ALWAYS confirm with the user first by repeating what you will do and waiting for an explicit "yes" / "confirm" / "ശരി".
-- If a tool returns an error or empty result, tell the user clearly and suggest next steps.
+Tools — IMPORTANT lookup strategy when a user gives a 10-digit mobile number:
+1. FIRST call \`elife_get_agent_hierarchy\` with that mobile. It searches \`pennyekart_agents\` and \`members\` and also returns upline + downline.
+2. If empty, call \`elife_check_payment_status\` (searches \`program_registrations\` + \`old_payments\`).
+3. As a last resort, call \`elife_query_table\` against \`members\` or \`program_registrations\` with the mobile column.
+- Use \`pennyekart_lookup_order\` for Pennyekart order/delivery questions.
+- For any WRITE action (registering a customer, sending a WhatsApp command), ALWAYS confirm with the user first by repeating what you will do and waiting for an explicit "yes" / "confirm" / "ശരി".
+- If a tool returns an error or empty result, say so clearly and suggest next steps.
 
 If you don't know something specific, suggest the customer check their profile/orders page or contact support.`;
 
@@ -91,11 +94,11 @@ function buildTools(config: Record<string, string | null>) {
         type: "function",
         function: {
           name: "elife_check_payment_status",
-          description: "Look up payment status for an e-Life customer by mobile number (mirrors the public form).",
+          description: "Look up an e-Life customer's program registrations and payment history by mobile number. Searches `program_registrations` and `old_payments` (with member join).",
           parameters: {
             type: "object",
             properties: {
-              mobile: { type: "string", description: "10-digit mobile number" },
+              mobile: { type: "string", description: "10-digit mobile number (any format; will be normalized)" },
             },
             required: ["mobile"],
           },
@@ -105,11 +108,11 @@ function buildTools(config: Record<string, string | null>) {
         type: "function",
         function: {
           name: "elife_get_agent_hierarchy",
-          description: "Look up an agent's upline/downline by mobile or agent ID.",
+          description: "Look up an e-Life agent by mobile number or agent ID. Searches `pennyekart_agents` and `members`, then enriches with upline (referrer) and direct downline. Use this FIRST whenever a user gives a mobile number.",
           parameters: {
             type: "object",
             properties: {
-              mobile: { type: "string" },
+              mobile: { type: "string", description: "10-digit mobile (any format)" },
               agent_id: { type: "string" },
             },
           },
@@ -160,6 +163,51 @@ function buildTools(config: Record<string, string | null>) {
   return tools;
 }
 
+// Normalize an Indian mobile: strip non-digits, remove leading "91" or "0", keep last 10 digits.
+function normalizeMobile(raw: string): string {
+  let s = String(raw || "").replace(/\D/g, "");
+  if (s.startsWith("91") && s.length > 10) s = s.slice(2);
+  s = s.replace(/^0+/, "");
+  if (s.length > 10) s = s.slice(-10);
+  return s;
+}
+
+// Try each candidate column individually so a missing column doesn't break the whole `or()`.
+async function findByMobile(
+  elife: any,
+  allowedTables: string[],
+  mobile: string,
+  candidates: { table: string; cols: string[]; jsonbPaths?: string[] }[],
+  limit = 10,
+): Promise<{ source: string; rows: any[]; matched_column?: string } | null> {
+  const variants = Array.from(new Set([mobile, `91${mobile}`, `+91${mobile}`, `0${mobile}`]));
+  for (const c of candidates) {
+    if (allowedTables.length && !allowedTables.includes(c.table)) continue;
+
+    // Try plain columns one at a time
+    for (const col of c.cols) {
+      for (const v of variants) {
+        const { data, error } = await elife.from(c.table).select("*").eq(col, v).limit(limit);
+        if (error) {
+          // Column doesn't exist — try the next column variant
+          break;
+        }
+        if (data && data.length) return { source: c.table, rows: data, matched_column: col };
+      }
+    }
+
+    // Try JSONB paths e.g. "answers->_fixed->>mobile"
+    for (const path of c.jsonbPaths || []) {
+      for (const v of variants) {
+        const { data, error } = await elife.from(c.table).select("*").eq(path, v).limit(limit);
+        if (error) break;
+        if (data && data.length) return { source: c.table, rows: data, matched_column: path };
+      }
+    }
+  }
+  return null;
+}
+
 async function executeTool(
   name: string,
   args: any,
@@ -195,40 +243,93 @@ async function executeTool(
   }
 
   if (name === "elife_check_payment_status") {
-    const mobile = String(args.mobile || "").replace(/\D/g, "");
-    if (mobile.length < 10) return { error: "Invalid mobile number" };
-    // Try common table names
-    for (const table of ["registrations", "payments", "customers"]) {
-      if (ctx.allowedTables.length && !ctx.allowedTables.includes(table)) continue;
-      const { data } = await ctx.elife.from(table).select("*").or(`mobile.eq.${mobile},mobile_number.eq.${mobile},phone.eq.${mobile}`).limit(5);
-      if (data && data.length) return { source: table, results: data };
+    const mobile = normalizeMobile(args.mobile);
+    if (mobile.length < 10) return { error: "Invalid mobile number — please give a 10-digit number." };
+
+    const hit = await findByMobile(ctx.elife, ctx.allowedTables, mobile, [
+      // program_registrations stores mobile inside JSONB: answers->_fixed->>mobile
+      { table: "program_registrations", cols: ["mobile", "mobile_number", "phone"], jsonbPaths: ["answers->_fixed->>mobile", "answers->>mobile"] },
+      { table: "old_payments", cols: ["mobile"] },
+      { table: "members", cols: ["mobile", "mobile_number", "phone", "whatsapp_number"] },
+    ]);
+
+    if (!hit) {
+      return { results: [], note: `No payment/registration records found for ${mobile} in program_registrations, old_payments, or members.` };
     }
-    return { results: [], note: "No matching records found in allowed e-Life tables." };
+    return { source: hit.source, mobile, matched_column: hit.matched_column, results: hit.rows };
   }
 
   if (name === "elife_get_agent_hierarchy") {
-    const mobile = args.mobile ? String(args.mobile).replace(/\D/g, "") : null;
+    const mobile = args.mobile ? normalizeMobile(args.mobile) : null;
     const agentId = args.agent_id ?? null;
     if (!mobile && !agentId) return { error: "Provide mobile or agent_id" };
-    for (const table of ["agents", "agent_hierarchy", "users"]) {
-      if (ctx.allowedTables.length && !ctx.allowedTables.includes(table)) continue;
-      let q = ctx.elife.from(table).select("*").limit(10);
-      if (mobile) q = q.or(`mobile.eq.${mobile},mobile_number.eq.${mobile}`);
-      else if (agentId) q = q.eq("id", agentId);
-      const { data } = await q;
-      if (data && data.length) return { source: table, agents: data };
+
+    let agent: any = null;
+    let source: string | null = null;
+
+    if (mobile) {
+      const hit = await findByMobile(ctx.elife, ctx.allowedTables, mobile, [
+        { table: "pennyekart_agents", cols: ["mobile"] },
+        { table: "members", cols: ["mobile", "mobile_number", "phone", "whatsapp_number"] },
+      ], 5);
+      if (hit) {
+        agent = hit.rows[0];
+        source = hit.source;
+      }
+    } else if (agentId) {
+      for (const table of ["pennyekart_agents", "members"]) {
+        if (ctx.allowedTables.length && !ctx.allowedTables.includes(table)) continue;
+        const { data } = await ctx.elife.from(table).select("*").eq("id", agentId).limit(1);
+        if (data && data.length) { agent = data[0]; source = table; break; }
+      }
     }
-    return { agents: [], note: "No agent records found." };
+
+    // Fallback: if not found in agents/members but mobile was given, also surface program_registrations matches
+    // so the user gets *some* useful info instead of a flat "not found".
+    if (!agent && mobile) {
+      const regHit = await findByMobile(ctx.elife, ctx.allowedTables, mobile, [
+        { table: "program_registrations", cols: [], jsonbPaths: ["answers->_fixed->>mobile", "answers->>mobile"] },
+        { table: "old_payments", cols: ["mobile"] },
+      ], 10);
+      if (regHit) {
+        return {
+          agent: null,
+          note: `${mobile} is not a registered agent in pennyekart_agents, but found ${regHit.rows.length} record(s) in ${regHit.source}.`,
+          related_source: regHit.source,
+          related_records: regHit.rows,
+        };
+      }
+      return { agent: null, note: `No agent or registration found for ${mobile}.` };
+    }
+
+    if (!agent) {
+      return { agent: null, note: `No agent found for ${agentId}.` };
+    }
+
+    // Enrich with upline + downline using the real e-Life schema (parent_agent_id on pennyekart_agents).
+    let upline: any = null;
+    if (source === "pennyekart_agents" && agent.parent_agent_id) {
+      const { data } = await ctx.elife.from("pennyekart_agents").select("*").eq("id", agent.parent_agent_id).limit(1);
+      if (data && data.length) upline = data[0];
+    }
+
+    let downline: any[] = [];
+    if (source === "pennyekart_agents") {
+      const { data } = await ctx.elife.from("pennyekart_agents").select("*").eq("parent_agent_id", agent.id).limit(50);
+      if (data) downline = data;
+    }
+
+    return { source, agent, upline, downline_count: downline.length, downline };
   }
 
   if (name === "elife_create_registration") {
     if (!ctx.writeEnabled) return { error: "Write access is disabled by admin." };
     if (!args.confirmed) return { error: "User confirmation required." };
-    if (ctx.allowedTables.length && !ctx.allowedTables.includes("registrations")) {
-      return { error: "registrations table is not in the allowlist." };
+    if (ctx.allowedTables.length && !ctx.allowedTables.includes("program_registrations")) {
+      return { error: "program_registrations table is not in the allowlist." };
     }
-    const { data, error } = await ctx.elife.from("registrations").insert({
-      mobile: args.mobile,
+    const { data, error } = await ctx.elife.from("program_registrations").insert({
+      mobile: normalizeMobile(args.mobile),
       full_name: args.full_name,
       program_id: args.program_id,
     }).select().maybeSingle();
@@ -239,11 +340,10 @@ async function executeTool(
   if (name === "elife_send_whatsapp_command") {
     if (!ctx.writeEnabled) return { error: "Write access is disabled by admin." };
     if (!args.confirmed) return { error: "User confirmation required." };
-    // Insert into e-Life's whatsapp_commands queue table (if allowlisted)
-    if (ctx.allowedTables.length && !ctx.allowedTables.includes("whatsapp_commands")) {
-      return { error: "whatsapp_commands table is not in the allowlist." };
+    if (ctx.allowedTables.length && !ctx.allowedTables.includes("whatsapp_bot_commands")) {
+      return { error: "whatsapp_bot_commands table is not in the allowlist." };
     }
-    const { data, error } = await ctx.elife.from("whatsapp_commands").insert({
+    const { data, error } = await ctx.elife.from("whatsapp_bot_commands").insert({
       to: args.to,
       command: args.command,
       source: "pennyekart_chatbot",
