@@ -77,9 +77,33 @@ serve(async (req) => {
     }
 
     const spec = await specRes.json();
-    const tables = Object.keys(spec.definitions ?? spec.components?.schemas ?? {}).sort();
+    const defs = spec.definitions ?? spec.components?.schemas ?? {};
+    const tables = Object.keys(defs).sort();
 
-    return new Response(JSON.stringify({ ok: true, tables, url: elifeUrl }), {
+    // Optional: probe specific tables for sample data + columns
+    const url = new URL(req.url);
+    const probe = url.searchParams.get("probe");
+    let probeData: Record<string, any> = {};
+    if (probe) {
+      const targets = probe.split(",").map((s) => s.trim()).filter(Boolean);
+      for (const t of targets) {
+        try {
+          const r = await fetch(`${elifeUrl}/rest/v1/${t}?limit=3`, {
+            headers: { apikey: elifeKey, Authorization: `Bearer ${elifeKey}` },
+          });
+          const rows = r.ok ? await r.json() : null;
+          probeData[t] = {
+            columns: Object.keys(defs[t]?.properties ?? {}),
+            sample: rows,
+            status: r.status,
+          };
+        } catch (e) {
+          probeData[t] = { error: e instanceof Error ? e.message : String(e) };
+        }
+      }
+    }
+
+    return new Response(JSON.stringify({ ok: true, tables, url: elifeUrl, probe: probeData }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
