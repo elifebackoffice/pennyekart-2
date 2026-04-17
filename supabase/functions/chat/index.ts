@@ -631,11 +631,40 @@ serve(async (req) => {
 
     const allowedTables = (config.elife_allowed_tables || "").split(",").map((s) => s.trim()).filter(Boolean);
     const writeEnabled = config.elife_write_enabled === "true";
+
+    // Verify whether the caller is a registered e-Life agent (defence-in-depth gate for agent-only tools)
+    let callerIsAgent = false;
+    if (elife && callerMobile && callerMobile.length === 10) {
+      const variants = Array.from(new Set([callerMobile, `91${callerMobile}`, `0${callerMobile}`]));
+      const probes: { table: string; cols: string[] }[] = [
+        { table: "pennyekart_agents", cols: ["mobile"] },
+        { table: "members", cols: ["mobile", "mobile_number", "phone", "whatsapp_number"] },
+      ];
+      outer: for (const p of probes) {
+        if (allowedTables.length && !allowedTables.includes(p.table)) continue;
+        for (const col of p.cols) {
+          for (const v of variants) {
+            const { data, error } = await elife.from(p.table).select("id").eq(col, v).limit(1);
+            if (error) break;
+            if (data && data.length) { callerIsAgent = true; break outer; }
+          }
+        }
+      }
+    }
+
     const tools = buildTools(config);
+
+    // Inject runtime context into the system prompt so the model knows who the caller is
+    let runtimeNote = "\n\n--- CALLER CONTEXT ---";
+    runtimeNote += `\n- Logged in: ${userId ? "yes" : "no"}`;
+    if (callerMobile) runtimeNote += `\n- Caller mobile: ${callerMobile}`;
+    if (config.elife_enabled === "true") {
+      runtimeNote += `\n- e-Life agent: ${callerIsAgent ? "yes — agent-only tools are allowed for this user" : "no — DO NOT call elife_log_daily_work, elife_get_my_tasks, elife_get_work_logs, elife_submit_task_feedback, elife_file_complaint or any write tool. Politely tell the user that agent features need a registered agent mobile."}`;
+    }
 
     const maxHistory = parseInt(config.max_history_messages || "20", 10);
     let convo: any[] = [
-      { role: "system", content: systemPrompt },
+      { role: "system", content: systemPrompt + runtimeNote },
       ...messages.slice(-maxHistory),
     ];
 
