@@ -163,6 +163,41 @@ function buildTools(config: Record<string, string | null>) {
   return tools;
 }
 
+// Normalize an Indian mobile: strip non-digits, remove leading "91" or "0", keep last 10 digits.
+function normalizeMobile(raw: string): string {
+  let s = String(raw || "").replace(/\D/g, "");
+  if (s.startsWith("91") && s.length > 10) s = s.slice(2);
+  s = s.replace(/^0+/, "");
+  if (s.length > 10) s = s.slice(-10);
+  return s;
+}
+
+// Try a list of (table, columns) combos with `or(col.eq.value)` and return the first non-empty hit.
+async function findByMobile(
+  elife: any,
+  allowedTables: string[],
+  mobile: string,
+  candidates: { table: string; cols: string[] }[],
+  limit = 10,
+): Promise<{ source: string; rows: any[] } | null> {
+  const variants = Array.from(new Set([mobile, `91${mobile}`, `+91${mobile}`, `0${mobile}`]));
+  for (const c of candidates) {
+    if (allowedTables.length && !allowedTables.includes(c.table)) continue;
+    const orParts: string[] = [];
+    for (const col of c.cols) {
+      for (const v of variants) orParts.push(`${col}.eq.${v}`);
+    }
+    const { data, error } = await elife.from(c.table).select("*").or(orParts.join(",")).limit(limit);
+    if (error) {
+      // Column mismatch / table missing — keep trying other tables
+      console.log(`findByMobile ${c.table} error:`, error.message);
+      continue;
+    }
+    if (data && data.length) return { source: c.table, rows: data };
+  }
+  return null;
+}
+
 async function executeTool(
   name: string,
   args: any,
