@@ -94,11 +94,11 @@ function buildTools(config: Record<string, string | null>) {
         type: "function",
         function: {
           name: "elife_check_payment_status",
-          description: "Look up payment status for an e-Life customer by mobile number (mirrors the public form).",
+          description: "Look up an e-Life customer's program registrations and payment history by mobile number. Searches `program_registrations` and `old_payments` (with member join).",
           parameters: {
             type: "object",
             properties: {
-              mobile: { type: "string", description: "10-digit mobile number" },
+              mobile: { type: "string", description: "10-digit mobile number (any format; will be normalized)" },
             },
             required: ["mobile"],
           },
@@ -108,11 +108,11 @@ function buildTools(config: Record<string, string | null>) {
         type: "function",
         function: {
           name: "elife_get_agent_hierarchy",
-          description: "Look up an agent's upline/downline by mobile or agent ID.",
+          description: "Look up an e-Life agent by mobile number or agent ID. Searches `pennyekart_agents` and `members`, then enriches with upline (referrer) and direct downline. Use this FIRST whenever a user gives a mobile number.",
           parameters: {
             type: "object",
             properties: {
-              mobile: { type: "string" },
+              mobile: { type: "string", description: "10-digit mobile (any format)" },
               agent_id: { type: "string" },
             },
           },
