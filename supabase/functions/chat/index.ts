@@ -247,15 +247,16 @@ async function executeTool(
     if (mobile.length < 10) return { error: "Invalid mobile number — please give a 10-digit number." };
 
     const hit = await findByMobile(ctx.elife, ctx.allowedTables, mobile, [
-      { table: "program_registrations", cols: ["mobile", "mobile_number", "phone", "whatsapp_number", "contact_number"] },
-      { table: "old_payments", cols: ["mobile", "mobile_number", "phone", "whatsapp_number", "contact_number"] },
-      { table: "members", cols: ["mobile", "mobile_number", "phone", "whatsapp_number", "contact_number"] },
+      // program_registrations stores mobile inside JSONB: answers->_fixed->>mobile
+      { table: "program_registrations", cols: ["mobile", "mobile_number", "phone"], jsonbPaths: ["answers->_fixed->>mobile", "answers->>mobile"] },
+      { table: "old_payments", cols: ["mobile"] },
+      { table: "members", cols: ["mobile", "mobile_number", "phone", "whatsapp_number"] },
     ]);
 
     if (!hit) {
       return { results: [], note: `No payment/registration records found for ${mobile} in program_registrations, old_payments, or members.` };
     }
-    return { source: hit.source, mobile, results: hit.rows };
+    return { source: hit.source, mobile, matched_column: hit.matched_column, results: hit.rows };
   }
 
   if (name === "elife_get_agent_hierarchy") {
@@ -268,8 +269,8 @@ async function executeTool(
 
     if (mobile) {
       const hit = await findByMobile(ctx.elife, ctx.allowedTables, mobile, [
-        { table: "pennyekart_agents", cols: ["mobile", "mobile_number", "phone", "whatsapp_number", "contact_number"] },
-        { table: "members", cols: ["mobile", "mobile_number", "phone", "whatsapp_number", "contact_number"] },
+        { table: "pennyekart_agents", cols: ["mobile"] },
+        { table: "members", cols: ["mobile", "mobile_number", "phone", "whatsapp_number"] },
       ], 5);
       if (hit) {
         agent = hit.rows[0];
@@ -283,41 +284,38 @@ async function executeTool(
       }
     }
 
-    if (!agent) {
-      return { agents: [], note: `No agent found for ${mobile || agentId} in pennyekart_agents or members.` };
-    }
-
-    // Enrich with upline + downline. Try several common parent/referrer column names.
-    const uplineCandidates = ["referrer_id", "parent_id", "upline_id", "sponsor_id", "introducer_id"];
-    const uplineMobileCols = ["referrer_mobile", "parent_mobile", "upline_mobile", "sponsor_mobile"];
-
-    let upline: any = null;
-    for (const col of uplineCandidates) {
-      const val = agent[col];
-      if (!val || !source) continue;
-      const { data } = await ctx.elife.from(source).select("*").eq("id", val).limit(1);
-      if (data && data.length) { upline = data[0]; break; }
-    }
-    if (!upline) {
-      for (const col of uplineMobileCols) {
-        const val = agent[col];
-        if (!val || !source) continue;
-        const norm = normalizeMobile(val);
-        const hit = await findByMobile(ctx.elife, ctx.allowedTables, norm, [
-          { table: source, cols: ["mobile", "mobile_number", "phone", "whatsapp_number"] },
-        ], 1);
-        if (hit) { upline = hit.rows[0]; break; }
+    // Fallback: if not found in agents/members but mobile was given, also surface program_registrations matches
+    // so the user gets *some* useful info instead of a flat "not found".
+    if (!agent && mobile) {
+      const regHit = await findByMobile(ctx.elife, ctx.allowedTables, mobile, [
+        { table: "program_registrations", cols: [], jsonbPaths: ["answers->_fixed->>mobile", "answers->>mobile"] },
+        { table: "old_payments", cols: ["mobile"] },
+      ], 10);
+      if (regHit) {
+        return {
+          agent: null,
+          note: `${mobile} is not a registered agent in pennyekart_agents, but found ${regHit.rows.length} record(s) in ${regHit.source}.`,
+          related_source: regHit.source,
+          related_records: regHit.rows,
+        };
       }
+      return { agent: null, note: `No agent or registration found for ${mobile}.` };
     }
 
-    // Direct downline: anyone whose referrer_*/parent_* points to this agent (by id or mobile)
+    if (!agent) {
+      return { agent: null, note: `No agent found for ${agentId}.` };
+    }
+
+    // Enrich with upline + downline using the real e-Life schema (parent_agent_id on pennyekart_agents).
+    let upline: any = null;
+    if (source === "pennyekart_agents" && agent.parent_agent_id) {
+      const { data } = await ctx.elife.from("pennyekart_agents").select("*").eq("id", agent.parent_agent_id).limit(1);
+      if (data && data.length) upline = data[0];
+    }
+
     let downline: any[] = [];
-    if (source) {
-      const myMobile = normalizeMobile(agent.mobile || agent.mobile_number || agent.phone || agent.whatsapp_number || "");
-      const orParts: string[] = [];
-      for (const col of uplineCandidates) orParts.push(`${col}.eq.${agent.id}`);
-      if (myMobile) for (const col of uplineMobileCols) orParts.push(`${col}.eq.${myMobile}`);
-      const { data } = await ctx.elife.from(source).select("*").or(orParts.join(",")).limit(20);
+    if (source === "pennyekart_agents") {
+      const { data } = await ctx.elife.from("pennyekart_agents").select("*").eq("parent_agent_id", agent.id).limit(50);
       if (data) downline = data;
     }
 
