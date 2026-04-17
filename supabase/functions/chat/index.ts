@@ -15,7 +15,7 @@ Your role:
 - Explain wallet points, referral rewards, and Penny Prime benefits
 - Guide customers through the app features (categories, flash sales, services)
 - Provide customer support for common issues
-- When the e-Life Society bridge is enabled, you can help users explore self-employment programs, check their e-Life payment status, look up agent hierarchies (upline/downline), and (with confirmation) register them for programs.
+- When the e-Life Society bridge is enabled, you can help registered agents log daily work, view their assigned tasks, submit task feedback, file complaints, check payment status, and look up agent hierarchies (upline/downline). You can also list e-Life's WhatsApp bot core commands when asked.
 
 Tone: Warm, helpful, concise. Keep responses short (2-4 sentences) unless the customer asks for detail.
 
@@ -23,8 +23,13 @@ Tools — IMPORTANT lookup strategy when a user gives a 10-digit mobile number:
 1. FIRST call \`elife_get_agent_hierarchy\` with that mobile. It searches \`pennyekart_agents\` and \`members\` and also returns upline + downline.
 2. If empty, call \`elife_check_payment_status\` (searches \`program_registrations\` + \`old_payments\`).
 3. As a last resort, call \`elife_query_table\` against \`members\` or \`program_registrations\` with the mobile column.
+- For "log my daily work" / "ദിവസത്തെ ജോലി രേഖപ്പെടുത്തുക" / "today I did X": call \`elife_log_daily_work\` with the user's mobile + work text. Confirm first.
+- For "what are my tasks" / "എന്റെ ടാസ്കുകൾ": call \`elife_get_my_tasks\`.
+- For "mark task complete" / task feedback: call \`elife_submit_task_feedback\` (confirm first).
+- For "file a complaint" / "പരാതി": call \`elife_file_complaint\` (confirm first).
+- For "what WhatsApp commands can I send" / "കമാൻഡുകൾ": call \`elife_list_whatsapp_commands\`.
 - Use \`pennyekart_lookup_order\` for Pennyekart order/delivery questions.
-- For any WRITE action (registering a customer, sending a WhatsApp command), ALWAYS confirm with the user first by repeating what you will do and waiting for an explicit "yes" / "confirm" / "ശരി".
+- For any WRITE action (logging work, submitting feedback, filing a complaint, registering, sending a WhatsApp command), ALWAYS confirm with the user first by repeating what you will do and waiting for explicit "yes" / "confirm" / "ശരി".
 - If a tool returns an error or empty result, say so clearly and suggest next steps.
 
 If you don't know something specific, suggest the customer check their profile/orders page or contact support.`;
@@ -118,6 +123,43 @@ function buildTools(config: Record<string, string | null>) {
           },
         },
       },
+      {
+        type: "function",
+        function: {
+          name: "elife_get_my_tasks",
+          description: "Get the current tasks assigned to an e-Life agent's panchayath, plus the agent's feedback status for each. Identifies the agent by their mobile number.",
+          parameters: {
+            type: "object",
+            properties: {
+              mobile: { type: "string", description: "Agent's 10-digit mobile" },
+            },
+            required: ["mobile"],
+          },
+        },
+      },
+      {
+        type: "function",
+        function: {
+          name: "elife_get_work_logs",
+          description: "Get an e-Life agent's recent daily work log entries from `agent_work_logs`. Identifies the agent by mobile.",
+          parameters: {
+            type: "object",
+            properties: {
+              mobile: { type: "string", description: "Agent's 10-digit mobile" },
+              days: { type: "number", description: "How many days back to look (default 7, max 30)" },
+            },
+            required: ["mobile"],
+          },
+        },
+      },
+      {
+        type: "function",
+        function: {
+          name: "elife_list_whatsapp_commands",
+          description: "List the active core WhatsApp bot commands from e-Life's `whatsapp_bot_commands` table (keyword, label, response). Use when a user asks 'what commands can I send' or wants the command menu.",
+          parameters: { type: "object", properties: {} },
+        },
+      },
     );
 
     if (config.elife_write_enabled === "true") {
@@ -135,6 +177,60 @@ function buildTools(config: Record<string, string | null>) {
               confirmed: { type: "boolean", description: "Must be true; the user has explicitly confirmed." },
             },
             required: ["mobile", "full_name", "program_id", "confirmed"],
+          },
+        },
+      });
+
+      tools.push({
+        type: "function",
+        function: {
+          name: "elife_log_daily_work",
+          description: "Log a daily work entry for an e-Life agent into `agent_work_logs`. Looks up the agent by mobile, then inserts (work_date, work_details). REQUIRES explicit user confirmation.",
+          parameters: {
+            type: "object",
+            properties: {
+              mobile: { type: "string", description: "Agent's 10-digit mobile" },
+              work_text: { type: "string", description: "What the agent did today (free text)" },
+              work_date: { type: "string", description: "Optional ISO date YYYY-MM-DD; defaults to today" },
+              confirmed: { type: "boolean", description: "Must be true after the user confirms." },
+            },
+            required: ["mobile", "work_text", "confirmed"],
+          },
+        },
+      });
+
+      tools.push({
+        type: "function",
+        function: {
+          name: "elife_submit_task_feedback",
+          description: "Submit feedback for an e-Life agent task into `pennyekart_agent_task_feedback`. status must be 'completed' or 'not_completed'. Looks up agent by mobile. REQUIRES confirmation.",
+          parameters: {
+            type: "object",
+            properties: {
+              mobile: { type: "string" },
+              task_id: { type: "string" },
+              status: { type: "string", enum: ["completed", "not_completed"] },
+              remarks: { type: "string" },
+              confirmed: { type: "boolean" },
+            },
+            required: ["mobile", "task_id", "status", "confirmed"],
+          },
+        },
+      });
+
+      tools.push({
+        type: "function",
+        function: {
+          name: "elife_file_complaint",
+          description: "File a complaint for an e-Life agent into `agent_complaints`. Looks up the agent by mobile. REQUIRES confirmation.",
+          parameters: {
+            type: "object",
+            properties: {
+              mobile: { type: "string" },
+              complaint_text: { type: "string" },
+              confirmed: { type: "boolean" },
+            },
+            required: ["mobile", "complaint_text", "confirmed"],
           },
         },
       });
@@ -350,6 +446,112 @@ async function executeTool(
     }).select().maybeSingle();
     if (error) return { error: error.message };
     return { ok: true, queued: data };
+  }
+
+  // Helper: resolve a pennyekart_agents row by mobile (normalized).
+  async function resolveAgent(mobile: string): Promise<any | null> {
+    const m = normalizeMobile(mobile);
+    if (m.length < 10) return null;
+    if (ctx.allowedTables.length && !ctx.allowedTables.includes("pennyekart_agents")) return null;
+    for (const v of [m, `91${m}`, `0${m}`]) {
+      const { data } = await ctx.elife.from("pennyekart_agents").select("*").eq("mobile", v).limit(1);
+      if (data && data.length) return data[0];
+    }
+    return null;
+  }
+
+  if (name === "elife_get_my_tasks") {
+    const agent = await resolveAgent(args.mobile);
+    if (!agent) return { error: `No agent found for mobile ${args.mobile}.` };
+    if (ctx.allowedTables.length && !ctx.allowedTables.includes("pennyekart_agent_tasks")) {
+      return { error: "pennyekart_agent_tasks not in allowlist." };
+    }
+    const { data: tasks, error } = await ctx.elife
+      .from("pennyekart_agent_tasks").select("*")
+      .eq("panchayath_id", agent.panchayath_id).eq("is_active", true)
+      .order("created_at", { ascending: false }).limit(20);
+    if (error) return { error: error.message };
+    let feedback: any[] = [];
+    if (tasks?.length && (!ctx.allowedTables.length || ctx.allowedTables.includes("pennyekart_agent_task_feedback"))) {
+      const { data: fb } = await ctx.elife.from("pennyekart_agent_task_feedback")
+        .select("*").eq("agent_id", agent.id).in("task_id", tasks.map((t: any) => t.id));
+      feedback = fb ?? [];
+    }
+    return { agent: { id: agent.id, name: agent.name, panchayath_id: agent.panchayath_id }, tasks: tasks ?? [], feedback };
+  }
+
+  if (name === "elife_get_work_logs") {
+    const agent = await resolveAgent(args.mobile);
+    if (!agent) return { error: `No agent found for mobile ${args.mobile}.` };
+    if (ctx.allowedTables.length && !ctx.allowedTables.includes("agent_work_logs")) {
+      return { error: "agent_work_logs not in allowlist." };
+    }
+    const days = Math.min(Math.max(Number(args.days) || 7, 1), 30);
+    const since = new Date(Date.now() - days * 86400_000).toISOString().slice(0, 10);
+    const { data, error } = await ctx.elife.from("agent_work_logs").select("*")
+      .eq("agent_id", agent.id).gte("work_date", since)
+      .order("work_date", { ascending: false }).limit(50);
+    if (error) return { error: error.message };
+    return { agent: { id: agent.id, name: agent.name }, logs: data ?? [] };
+  }
+
+  if (name === "elife_list_whatsapp_commands") {
+    if (ctx.allowedTables.length && !ctx.allowedTables.includes("whatsapp_bot_commands")) {
+      return { error: "whatsapp_bot_commands not in allowlist." };
+    }
+    const { data, error } = await ctx.elife.from("whatsapp_bot_commands")
+      .select("keyword, alt_keyword, label, response_text, sort_order")
+      .eq("is_active", true).order("sort_order", { ascending: true }).limit(50);
+    if (error) return { error: error.message };
+    return { commands: data ?? [] };
+  }
+
+  if (name === "elife_log_daily_work") {
+    if (!ctx.writeEnabled) return { error: "Write access is disabled by admin." };
+    if (!args.confirmed) return { error: "User confirmation required." };
+    if (ctx.allowedTables.length && !ctx.allowedTables.includes("agent_work_logs")) {
+      return { error: "agent_work_logs not in allowlist." };
+    }
+    const agent = await resolveAgent(args.mobile);
+    if (!agent) return { error: `No agent found for mobile ${args.mobile}.` };
+    const work_date = args.work_date || new Date().toISOString().slice(0, 10);
+    const { data, error } = await ctx.elife.from("agent_work_logs").insert({
+      agent_id: agent.id, work_date, work_details: String(args.work_text || "").trim(),
+    }).select().maybeSingle();
+    if (error) return { error: error.message };
+    return { ok: true, agent: { id: agent.id, name: agent.name }, log: data };
+  }
+
+  if (name === "elife_submit_task_feedback") {
+    if (!ctx.writeEnabled) return { error: "Write access is disabled by admin." };
+    if (!args.confirmed) return { error: "User confirmation required." };
+    if (!["completed", "not_completed"].includes(args.status)) return { error: "status must be 'completed' or 'not_completed'." };
+    if (ctx.allowedTables.length && !ctx.allowedTables.includes("pennyekart_agent_task_feedback")) {
+      return { error: "pennyekart_agent_task_feedback not in allowlist." };
+    }
+    const agent = await resolveAgent(args.mobile);
+    if (!agent) return { error: `No agent found for mobile ${args.mobile}.` };
+    const { data, error } = await ctx.elife.from("pennyekart_agent_task_feedback").insert({
+      task_id: args.task_id, agent_id: agent.id, status: args.status,
+      remarks: args.remarks ?? null, feedback_by: agent.id,
+    }).select().maybeSingle();
+    if (error) return { error: error.message };
+    return { ok: true, feedback: data };
+  }
+
+  if (name === "elife_file_complaint") {
+    if (!ctx.writeEnabled) return { error: "Write access is disabled by admin." };
+    if (!args.confirmed) return { error: "User confirmation required." };
+    if (ctx.allowedTables.length && !ctx.allowedTables.includes("agent_complaints")) {
+      return { error: "agent_complaints not in allowlist." };
+    }
+    const agent = await resolveAgent(args.mobile);
+    if (!agent) return { error: `No agent found for mobile ${args.mobile}.` };
+    const { data, error } = await ctx.elife.from("agent_complaints").insert({
+      agent_id: agent.id, complaint_text: String(args.complaint_text || "").trim(), status: "pending",
+    }).select().maybeSingle();
+    if (error) return { error: error.message };
+    return { ok: true, complaint: data };
   }
 
   return { error: `Unknown tool: ${name}` };
