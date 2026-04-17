@@ -448,6 +448,112 @@ async function executeTool(
     return { ok: true, queued: data };
   }
 
+  // Helper: resolve a pennyekart_agents row by mobile (normalized).
+  async function resolveAgent(mobile: string): Promise<any | null> {
+    const m = normalizeMobile(mobile);
+    if (m.length < 10) return null;
+    if (ctx.allowedTables.length && !ctx.allowedTables.includes("pennyekart_agents")) return null;
+    for (const v of [m, `91${m}`, `0${m}`]) {
+      const { data } = await ctx.elife.from("pennyekart_agents").select("*").eq("mobile", v).limit(1);
+      if (data && data.length) return data[0];
+    }
+    return null;
+  }
+
+  if (name === "elife_get_my_tasks") {
+    const agent = await resolveAgent(args.mobile);
+    if (!agent) return { error: `No agent found for mobile ${args.mobile}.` };
+    if (ctx.allowedTables.length && !ctx.allowedTables.includes("pennyekart_agent_tasks")) {
+      return { error: "pennyekart_agent_tasks not in allowlist." };
+    }
+    const { data: tasks, error } = await ctx.elife
+      .from("pennyekart_agent_tasks").select("*")
+      .eq("panchayath_id", agent.panchayath_id).eq("is_active", true)
+      .order("created_at", { ascending: false }).limit(20);
+    if (error) return { error: error.message };
+    let feedback: any[] = [];
+    if (tasks?.length && (!ctx.allowedTables.length || ctx.allowedTables.includes("pennyekart_agent_task_feedback"))) {
+      const { data: fb } = await ctx.elife.from("pennyekart_agent_task_feedback")
+        .select("*").eq("agent_id", agent.id).in("task_id", tasks.map((t: any) => t.id));
+      feedback = fb ?? [];
+    }
+    return { agent: { id: agent.id, name: agent.name, panchayath_id: agent.panchayath_id }, tasks: tasks ?? [], feedback };
+  }
+
+  if (name === "elife_get_work_logs") {
+    const agent = await resolveAgent(args.mobile);
+    if (!agent) return { error: `No agent found for mobile ${args.mobile}.` };
+    if (ctx.allowedTables.length && !ctx.allowedTables.includes("agent_work_logs")) {
+      return { error: "agent_work_logs not in allowlist." };
+    }
+    const days = Math.min(Math.max(Number(args.days) || 7, 1), 30);
+    const since = new Date(Date.now() - days * 86400_000).toISOString().slice(0, 10);
+    const { data, error } = await ctx.elife.from("agent_work_logs").select("*")
+      .eq("agent_id", agent.id).gte("work_date", since)
+      .order("work_date", { ascending: false }).limit(50);
+    if (error) return { error: error.message };
+    return { agent: { id: agent.id, name: agent.name }, logs: data ?? [] };
+  }
+
+  if (name === "elife_list_whatsapp_commands") {
+    if (ctx.allowedTables.length && !ctx.allowedTables.includes("whatsapp_bot_commands")) {
+      return { error: "whatsapp_bot_commands not in allowlist." };
+    }
+    const { data, error } = await ctx.elife.from("whatsapp_bot_commands")
+      .select("keyword, alt_keyword, label, response_text, sort_order")
+      .eq("is_active", true).order("sort_order", { ascending: true }).limit(50);
+    if (error) return { error: error.message };
+    return { commands: data ?? [] };
+  }
+
+  if (name === "elife_log_daily_work") {
+    if (!ctx.writeEnabled) return { error: "Write access is disabled by admin." };
+    if (!args.confirmed) return { error: "User confirmation required." };
+    if (ctx.allowedTables.length && !ctx.allowedTables.includes("agent_work_logs")) {
+      return { error: "agent_work_logs not in allowlist." };
+    }
+    const agent = await resolveAgent(args.mobile);
+    if (!agent) return { error: `No agent found for mobile ${args.mobile}.` };
+    const work_date = args.work_date || new Date().toISOString().slice(0, 10);
+    const { data, error } = await ctx.elife.from("agent_work_logs").insert({
+      agent_id: agent.id, work_date, work_details: String(args.work_text || "").trim(),
+    }).select().maybeSingle();
+    if (error) return { error: error.message };
+    return { ok: true, agent: { id: agent.id, name: agent.name }, log: data };
+  }
+
+  if (name === "elife_submit_task_feedback") {
+    if (!ctx.writeEnabled) return { error: "Write access is disabled by admin." };
+    if (!args.confirmed) return { error: "User confirmation required." };
+    if (!["completed", "not_completed"].includes(args.status)) return { error: "status must be 'completed' or 'not_completed'." };
+    if (ctx.allowedTables.length && !ctx.allowedTables.includes("pennyekart_agent_task_feedback")) {
+      return { error: "pennyekart_agent_task_feedback not in allowlist." };
+    }
+    const agent = await resolveAgent(args.mobile);
+    if (!agent) return { error: `No agent found for mobile ${args.mobile}.` };
+    const { data, error } = await ctx.elife.from("pennyekart_agent_task_feedback").insert({
+      task_id: args.task_id, agent_id: agent.id, status: args.status,
+      remarks: args.remarks ?? null, feedback_by: agent.id,
+    }).select().maybeSingle();
+    if (error) return { error: error.message };
+    return { ok: true, feedback: data };
+  }
+
+  if (name === "elife_file_complaint") {
+    if (!ctx.writeEnabled) return { error: "Write access is disabled by admin." };
+    if (!args.confirmed) return { error: "User confirmation required." };
+    if (ctx.allowedTables.length && !ctx.allowedTables.includes("agent_complaints")) {
+      return { error: "agent_complaints not in allowlist." };
+    }
+    const agent = await resolveAgent(args.mobile);
+    if (!agent) return { error: `No agent found for mobile ${args.mobile}.` };
+    const { data, error } = await ctx.elife.from("agent_complaints").insert({
+      agent_id: agent.id, complaint_text: String(args.complaint_text || "").trim(), status: "pending",
+    }).select().maybeSingle();
+    if (error) return { error: error.message };
+    return { ok: true, complaint: data };
+  }
+
   return { error: `Unknown tool: ${name}` };
 }
 
