@@ -307,8 +307,19 @@ async function findByMobile(
 async function executeTool(
   name: string,
   args: any,
-  ctx: { sb: any; elife: any | null; userId: string | null; allowedTables: string[]; writeEnabled: boolean },
+  ctx: { sb: any; elife: any | null; userId: string | null; callerMobile: string | null; callerIsAgent: boolean; allowedTables: string[]; writeEnabled: boolean },
 ): Promise<any> {
+  // Gate: agent-only tools require the logged-in caller to be a verified e-Life agent
+  const AGENT_ONLY = new Set([
+    "elife_get_my_tasks",
+    "elife_get_work_logs",
+    "elife_log_daily_work",
+    "elife_submit_task_feedback",
+    "elife_file_complaint",
+  ]);
+  if (AGENT_ONLY.has(name) && !ctx.callerIsAgent) {
+    return { error: "This tool is only available to registered e-Life agents. The current user's mobile is not in pennyekart_agents/members." };
+  }
   if (name === "pennyekart_lookup_order") {
     if (!ctx.userId) return { error: "Sign in to view orders." };
     if (args.order_id) {
@@ -580,6 +591,7 @@ serve(async (req) => {
 
     // Identify caller (best-effort; chatbot may be used by anon visitors)
     let userId: string | null = null;
+    let callerMobile: string | null = null;
     const authHeader = req.headers.get("Authorization");
     if (authHeader?.startsWith("Bearer ")) {
       const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
@@ -587,6 +599,10 @@ serve(async (req) => {
       });
       const { data: claims } = await userClient.auth.getClaims(authHeader.replace("Bearer ", ""));
       userId = claims?.claims?.sub ?? null;
+      if (userId) {
+        const { data: prof } = await sb.from("profiles").select("mobile_number, full_name").eq("user_id", userId).maybeSingle();
+        if (prof?.mobile_number) callerMobile = normalizeMobile(prof.mobile_number);
+      }
     }
 
     const [configRes, knowledgeRes] = await Promise.all([
@@ -626,11 +642,40 @@ serve(async (req) => {
 
     const allowedTables = (config.elife_allowed_tables || "").split(",").map((s) => s.trim()).filter(Boolean);
     const writeEnabled = config.elife_write_enabled === "true";
+
+    // Verify whether the caller is a registered e-Life agent (defence-in-depth gate for agent-only tools)
+    let callerIsAgent = false;
+    if (elife && callerMobile && callerMobile.length === 10) {
+      const variants = Array.from(new Set([callerMobile, `91${callerMobile}`, `0${callerMobile}`]));
+      const probes: { table: string; cols: string[] }[] = [
+        { table: "pennyekart_agents", cols: ["mobile"] },
+        { table: "members", cols: ["mobile", "mobile_number", "phone", "whatsapp_number"] },
+      ];
+      outer: for (const p of probes) {
+        if (allowedTables.length && !allowedTables.includes(p.table)) continue;
+        for (const col of p.cols) {
+          for (const v of variants) {
+            const { data, error } = await elife.from(p.table).select("id").eq(col, v).limit(1);
+            if (error) break;
+            if (data && data.length) { callerIsAgent = true; break outer; }
+          }
+        }
+      }
+    }
+
     const tools = buildTools(config);
+
+    // Inject runtime context into the system prompt so the model knows who the caller is
+    let runtimeNote = "\n\n--- CALLER CONTEXT ---";
+    runtimeNote += `\n- Logged in: ${userId ? "yes" : "no"}`;
+    if (callerMobile) runtimeNote += `\n- Caller mobile: ${callerMobile}`;
+    if (config.elife_enabled === "true") {
+      runtimeNote += `\n- e-Life agent: ${callerIsAgent ? "yes — agent-only tools are allowed for this user" : "no — DO NOT call elife_log_daily_work, elife_get_my_tasks, elife_get_work_logs, elife_submit_task_feedback, elife_file_complaint or any write tool. Politely tell the user that agent features need a registered agent mobile."}`;
+    }
 
     const maxHistory = parseInt(config.max_history_messages || "20", 10);
     let convo: any[] = [
-      { role: "system", content: systemPrompt },
+      { role: "system", content: systemPrompt + runtimeNote },
       ...messages.slice(-maxHistory),
     ];
 
@@ -705,7 +750,7 @@ serve(async (req) => {
         let status = "success";
         let errorMessage: string | null = null;
         try {
-          result = await executeTool(fnName, parsedArgs, { sb, elife, userId, allowedTables, writeEnabled });
+          result = await executeTool(fnName, parsedArgs, { sb, elife, userId, callerMobile, callerIsAgent, allowedTables, writeEnabled });
           if (result?.error) { status = "error"; errorMessage = result.error; }
         } catch (e) {
           status = "error";
