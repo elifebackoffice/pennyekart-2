@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useNotifications } from "@/hooks/useNotifications";
+import { useNotifications, type AppNotification } from "@/hooks/useNotifications";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Bell, ExternalLink } from "lucide-react";
@@ -11,47 +11,62 @@ const NotificationPopup = () => {
   const { firstUnread, markRead, markClicked } = useNotifications();
   const [open, setOpen] = useState(false);
   const [showFull, setShowFull] = useState(false);
+  const [activeNotification, setActiveNotification] = useState<AppNotification | null>(null);
   const navigate = useNavigate();
 
+  // Snapshot a new unread notification into local state so the popup
+  // doesn't disappear when markRead() updates the underlying list.
   useEffect(() => {
     if (!firstUnread) return;
+    if (open || activeNotification) return;
     const shown = JSON.parse(sessionStorage.getItem(SHOWN_KEY) || "[]") as string[];
     if (shown.includes(firstUnread.id)) return;
+    setActiveNotification(firstUnread);
     setOpen(true);
     setShowFull(false);
     sessionStorage.setItem(SHOWN_KEY, JSON.stringify([...shown, firstUnread.id]));
-  }, [firstUnread]);
+  }, [firstUnread, open, activeNotification]);
 
   // Auto-dismiss after configured seconds (0 = disabled)
-  // Only starts AFTER the user opens the full message, so the initial prompt never auto-closes.
+  // Only starts AFTER the user opens the full message.
   useEffect(() => {
-    if (!open || !showFull) return;
-    const seconds = firstUnread?.auto_dismiss_seconds ?? 0;
+    if (!open || !showFull || !activeNotification) return;
+    const seconds = activeNotification.auto_dismiss_seconds ?? 0;
     if (!seconds || seconds <= 0) return;
     const t = setTimeout(() => setOpen(false), seconds * 1000);
     return () => clearTimeout(t);
-  }, [open, showFull, firstUnread]);
+  }, [open, showFull, activeNotification]);
 
-  if (!firstUnread) return null;
+  // Clear local snapshot once dialog has fully closed
+  const handleOpenChange = (next: boolean) => {
+    setOpen(next);
+    if (!next) {
+      setShowFull(false);
+      // Defer clearing so closing animation doesn't flicker content
+      setTimeout(() => setActiveNotification(null), 200);
+    }
+  };
+
+  if (!activeNotification) return null;
 
   const handleView = () => {
     setShowFull(true);
-    markRead(firstUnread.id);
+    markRead(activeNotification.id);
   };
 
   const handleLinkClick = () => {
-    if (!firstUnread.link_url) return;
-    markClicked(firstUnread.id);
-    if (firstUnread.link_url.startsWith("http")) {
-      window.open(firstUnread.link_url, "_blank", "noopener,noreferrer");
+    if (!activeNotification.link_url) return;
+    markClicked(activeNotification.id);
+    if (activeNotification.link_url.startsWith("http")) {
+      window.open(activeNotification.link_url, "_blank", "noopener,noreferrer");
     } else {
-      navigate(firstUnread.link_url);
-      setOpen(false);
+      navigate(activeNotification.link_url);
+      handleOpenChange(false);
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-md">
         {!showFull ? (
           <>
@@ -64,7 +79,7 @@ const NotificationPopup = () => {
               </DialogTitle>
               <DialogDescription>You have a new message</DialogDescription>
               <div className="flex gap-2 mt-6 w-full">
-                <Button variant="outline" className="flex-1" onClick={() => setOpen(false)}>
+                <Button variant="outline" className="flex-1" onClick={() => handleOpenChange(false)}>
                   Later
                 </Button>
                 <Button className="flex-1" onClick={handleView}>
@@ -76,24 +91,24 @@ const NotificationPopup = () => {
         ) : (
           <>
             <DialogHeader>
-              <DialogTitle>{firstUnread.title}</DialogTitle>
+              <DialogTitle>{activeNotification.title}</DialogTitle>
             </DialogHeader>
-            {firstUnread.image_url && (
+            {activeNotification.image_url && (
               <img
-                src={firstUnread.image_url}
-                alt={firstUnread.title}
+                src={activeNotification.image_url}
+                alt={activeNotification.title}
                 className="w-full max-h-64 object-contain rounded-md border"
               />
             )}
-            <p className="text-sm text-foreground whitespace-pre-wrap">{firstUnread.message}</p>
+            <p className="text-sm text-foreground whitespace-pre-wrap">{activeNotification.message}</p>
             <div className="flex gap-2">
-              {firstUnread.link_url && (
+              {activeNotification.link_url && (
                 <Button className="flex-1" onClick={handleLinkClick}>
                   <ExternalLink className="h-4 w-4 mr-2" />
-                  {firstUnread.link_label || "Open Link"}
+                  {activeNotification.link_label || "Open Link"}
                 </Button>
               )}
-              <Button variant="outline" className="flex-1" onClick={() => setOpen(false)}>
+              <Button variant="outline" className="flex-1" onClick={() => handleOpenChange(false)}>
                 Close
               </Button>
             </div>
