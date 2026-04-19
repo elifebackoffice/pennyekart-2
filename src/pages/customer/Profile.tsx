@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Package, Clock, CheckCircle, Truck, MapPin, User, Phone, Mail, ChevronRight, ShoppingBag, Heart, Bell, Wallet, XCircle, RotateCcw } from "lucide-react";
+import { ArrowLeft, Package, Clock, CheckCircle, Truck, MapPin, User, Phone, Mail, ChevronRight, ShoppingBag, Heart, Bell, Wallet, XCircle, RotateCcw, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -14,6 +14,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { TodaysWorkSection } from "@/components/customer/TodaysWorkSection";
+import { useNotifications } from "@/hooks/useNotifications";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import NotificationDetailDialog from "@/components/NotificationDetailDialog";
 
 interface Order {
   id: string;
@@ -62,6 +65,9 @@ const Profile = () => {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [activeSection, setActiveSection] = useState(initialTab);
   const [roleName, setRoleName] = useState<string | null>(null);
+  const { notifications, loading: notificationsLoading, markRead } = useNotifications();
+  const [selectedNotification, setSelectedNotification] = useState<any>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -483,29 +489,72 @@ const Profile = () => {
         {/* Notifications Section */}
         {activeSection === "notifications" && (
           <Card>
-            <CardContent className="p-8 text-center text-muted-foreground">
-              <Bell className="h-10 w-10 mx-auto mb-2 opacity-40" />
-              <p className="font-medium">Notifications</p>
-              <p className="text-sm mt-1">No notifications yet</p>
+            <CardContent className="p-4">
+              {notificationsLoading ? (
+                <div className="p-8 text-center">
+                  <Skeleton className="h-10 w-40 mx-auto" />
+                </div>
+              ) : notifications.length === 0 ? (
+                <div className="p-8 text-center text-muted-foreground">
+                  <Bell className="h-10 w-10 mx-auto mb-2 opacity-40" />
+                  <p className="font-medium">Notifications</p>
+                  <p className="text-sm mt-1">No notifications yet</p>
+                </div>
+              ) : (
+                <ScrollArea className="h-[400px]">
+                  <div className="space-y-3">
+                    {notifications.map((n) => (
+                      <div
+                        key={n.id}
+                        className={`p-3 rounded-lg border cursor-pointer transition-colors hover:bg-muted/50 ${
+                          !n.read_at ? "bg-primary/5 border-primary/20" : "bg-card"
+                        }`}
+                        onClick={() => {
+                          if (!n.read_at) markRead(n.id);
+                          setSelectedNotification(n);
+                          setDetailOpen(true);
+                        }}
+                      >
+                        <div className="flex items-start gap-3">
+                          {n.image_url ? (
+                            <img src={n.image_url} alt="" className="w-10 h-10 rounded object-cover flex-shrink-0" />
+                          ) : (
+                            <div className="w-10 h-10 rounded bg-primary/10 flex items-center justify-center flex-shrink-0">
+                              <Bell className="h-4 w-4 text-primary" />
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium text-sm truncate">{n.title}</p>
+                              {!n.read_at && <span className="h-2 w-2 rounded-full bg-primary flex-shrink-0" />}
+                            </div>
+                            <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{n.message}</p>
+                            {n.link_url && (
+                              <span className="inline-flex items-center text-xs text-primary mt-1">
+                                <ExternalLink className="h-3 w-3 mr-1" />
+                                {n.link_label || "Open"}
+                              </span>
+                            )}
+                            <p className="text-[10px] text-muted-foreground mt-1">
+                              {new Date(n.created_at).toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
             </CardContent>
           </Card>
         )}
 
-        {/* Login Links */}
-        <Card>
-          <CardContent className="p-4 space-y-2">
-            <p className="text-sm font-semibold text-muted-foreground mb-2">Switch Account</p>
-            <Button variant="outline" className="w-full justify-start gap-2" onClick={() => navigate("/auth")}>
-              <User className="h-4 w-4" /> Admin Login
-            </Button>
-            <Button variant="outline" className="w-full justify-start gap-2" onClick={() => navigate("/selling-partner/login")}>
-              <ShoppingBag className="h-4 w-4" /> Selling Partner Login
-            </Button>
-            <Button variant="outline" className="w-full justify-start gap-2" onClick={() => navigate("/delivery-staff/login")}>
-              <Truck className="h-4 w-4" /> Delivery Partner Login
-            </Button>
-          </CardContent>
-        </Card>
+        <NotificationDetailDialog
+          notification={selectedNotification}
+          open={detailOpen}
+          onOpenChange={(o) => { setDetailOpen(o); if (!o) setTimeout(() => setSelectedNotification(null), 200); }}
+        />
+
 
         {/* Logout */}
         <Button variant="destructive" className="w-full" onClick={async () => { await signOut(); navigate("/"); }}>
