@@ -235,6 +235,8 @@ const NotificationsPage = () => {
     const text = encodeURIComponent(lines.join("\n"));
     window.open(`https://wa.me/?text=${text}`, "_blank");
   };
+
+  return (
     <AdminLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
