@@ -77,25 +77,57 @@ const Profile = () => {
     }
   }, [profile]);
 
+  const [linkedUserType, setLinkedUserType] = useState<string | null>(null);
+
   useEffect(() => {
     const fetchRole = async () => {
-      if (!profile?.role_id) {
-        setRoleName(null);
-        return;
+      // 1. Try current profile's role first
+      if (profile?.role_id) {
+        const { data } = await supabase
+          .from("roles")
+          .select("name")
+          .eq("id", profile.role_id)
+          .maybeSingle();
+        if (data?.name && data.name.toLowerCase() !== "customer") {
+          setRoleName(data.name);
+          setLinkedUserType(null);
+          return;
+        }
       }
-      const { data } = await supabase
-        .from("roles")
-        .select("name")
-        .eq("id", profile.role_id)
-        .maybeSingle();
-      if (data?.name && data.name.toLowerCase() !== "customer") {
-        setRoleName(data.name);
-      } else {
-        setRoleName(null);
+
+      // 2. Fallback: look up any sibling profile with the same mobile that has a role
+      // (e.g. customer also registered as selling_partner / delivery_staff / admin)
+      if (profile?.mobile_number) {
+        const { data: siblings } = await supabase
+          .from("profiles")
+          .select("role_id, user_type, is_super_admin")
+          .eq("mobile_number", profile.mobile_number)
+          .neq("user_id", profile.user_id);
+
+        const sibling = (siblings || []).find(s => s.role_id || s.is_super_admin || (s.user_type && s.user_type !== "customer"));
+        if (sibling) {
+          setLinkedUserType(sibling.user_type && sibling.user_type !== "customer" ? sibling.user_type : null);
+          if (sibling.role_id) {
+            const { data: roleData } = await supabase
+              .from("roles")
+              .select("name")
+              .eq("id", sibling.role_id)
+              .maybeSingle();
+            if (roleData?.name && roleData.name.toLowerCase() !== "customer") {
+              setRoleName(roleData.name);
+              return;
+            }
+          }
+          setRoleName(null);
+          return;
+        }
       }
+
+      setRoleName(null);
+      setLinkedUserType(null);
     };
     fetchRole();
-  }, [profile?.role_id]);
+  }, [profile?.role_id, profile?.mobile_number, profile?.user_id]);
 
   const fetchOrders = async () => {
     const { data, error } = await supabase
@@ -341,6 +373,11 @@ const Profile = () => {
                     {profile?.user_type && profile.user_type !== "customer" && (
                       <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
                         {profile.user_type.replace("_", " ")}
+                      </Badge>
+                    )}
+                    {linkedUserType && (
+                      <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
+                        {linkedUserType.replace("_", " ")}
                       </Badge>
                     )}
                   </div>
