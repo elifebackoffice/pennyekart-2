@@ -199,10 +199,11 @@ const NotificationsPage = () => {
     downloadCSV(`${safeTitle}_by_panchayath_ward.csv`, rows);
   };
 
-  const exportUsersCSV = () => {
+  const exportUsersCSV = (users?: any[], suffix = "users") => {
     const safeTitle = (analyticsFor?.title || "notification").replace(/[^a-z0-9]+/gi, "_");
+    const list = users ?? filteredUsers;
     const rows: any[][] = [["Name", "Mobile", "Panchayath", "Ward", "Delivered", "Read", "Clicked"]];
-    filteredUsers.forEach((u: any) => {
+    list.forEach((u: any) => {
       rows.push([
         u.full_name || "",
         u.mobile_number || "",
@@ -213,7 +214,36 @@ const NotificationsPage = () => {
         u.clicked_at || "",
       ]);
     });
-    downloadCSV(`${safeTitle}_users.csv`, rows);
+    downloadCSV(`${safeTitle}_${suffix}.csv`, rows);
+  };
+
+  // Group users by panchayath for the drilldown
+  const groupedUsersByPanchayath: Record<string, any[]> = filteredUsers.reduce((acc: Record<string, any[]>, u: any) => {
+    const key = u.local_body_name || "Unknown";
+    (acc[key] = acc[key] || []).push(u);
+    return acc;
+  }, {} as Record<string, any[]>);
+
+  const shareUsersToWhatsApp = (panchayath: string, users: any[]) => {
+    const d = users.filter((u) => u.delivered_at).length;
+    const r = users.filter((u) => u.read_at).length;
+    const c = users.filter((u) => u.clicked_at).length;
+    const lines = [
+      `*${analyticsFor?.title || "Notification"}*`,
+      `📍 *${panchayath}* — Per-User`,
+      ``,
+      `Users: ${users.length}  |  Delivered: ${d}  |  Read: ${r}  |  Clicked: ${c}`,
+      ``,
+      `*Users:*`,
+      ...[...users]
+        .sort((a, b) => (Number(a.ward_number) || 0) - (Number(b.ward_number) || 0))
+        .map(
+          (u) =>
+            `• ${u.full_name || "-"} (${u.mobile_number || "-"}) W${u.ward_number ?? "-"} — ${u.read_at ? "✅Read" : u.delivered_at ? "📨Delivered" : "—"}${u.clicked_at ? " 🔗" : ""}`
+        ),
+    ];
+    const text = encodeURIComponent(lines.join("\n"));
+    window.open(`https://wa.me/?text=${text}`, "_blank");
   };
 
   const shareToWhatsApp = (panchayath: string, groups: any[]) => {
