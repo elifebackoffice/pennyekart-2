@@ -662,6 +662,7 @@ const NotificationsPage = () => {
                                         <TableRow>
                                           <TableHead>Name</TableHead>
                                           <TableHead>Mobile</TableHead>
+                                          <TableHead>Role</TableHead>
                                           <TableHead className="w-20">Ward</TableHead>
                                           <TableHead>Delivered</TableHead>
                                           <TableHead>Read</TableHead>
@@ -675,6 +676,13 @@ const NotificationsPage = () => {
                                             <TableRow key={u.user_id}>
                                               <TableCell>{u.full_name || "-"}</TableCell>
                                               <TableCell className="text-xs">{u.mobile_number || "-"}</TableCell>
+                                              <TableCell>
+                                                {u.role_name ? (
+                                                  <Badge variant="secondary" className="text-[10px]">{u.role_name}</Badge>
+                                                ) : (
+                                                  <span className="text-xs text-muted-foreground">—</span>
+                                                )}
+                                              </TableCell>
                                               <TableCell>Ward {u.ward_number ?? "-"}</TableCell>
                                               <TableCell className="text-xs">{u.delivered_at ? new Date(u.delivered_at).toLocaleString() : "-"}</TableCell>
                                               <TableCell className="text-xs">{u.read_at ? new Date(u.read_at).toLocaleString() : "-"}</TableCell>
