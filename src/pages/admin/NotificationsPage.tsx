@@ -224,11 +224,12 @@ const NotificationsPage = () => {
   const exportUsersCSV = (users?: any[], suffix = "users") => {
     const safeTitle = (analyticsFor?.title || "notification").replace(/[^a-z0-9]+/gi, "_");
     const list = users ?? filteredUsers;
-    const rows: any[][] = [["Name", "Mobile", "Panchayath", "Ward", "Delivered", "Read", "Clicked"]];
+    const rows: any[][] = [["Name", "Mobile", "Role", "Panchayath", "Ward", "Delivered", "Read", "Clicked"]];
     list.forEach((u: any) => {
       rows.push([
         u.full_name || "",
         u.mobile_number || "",
+        u.role_name || "",
         u.local_body_name || "",
         u.ward_number ?? "",
         u.delivered_at || "",
@@ -638,7 +639,14 @@ const NotificationsPage = () => {
                                             <p className="font-medium truncate">{u.full_name || "-"}</p>
                                             <span className="text-xs text-muted-foreground shrink-0">{u.mobile_number || "-"}</span>
                                           </div>
-                                          <p className="text-xs text-muted-foreground">Ward {u.ward_number ?? "-"}</p>
+                                          <div className="flex items-center gap-1.5 flex-wrap">
+                                            <p className="text-xs text-muted-foreground">Ward {u.ward_number ?? "-"}</p>
+                                            {u.role_name ? (
+                                              <Badge variant="secondary" className="text-[10px] h-5">{u.role_name}</Badge>
+                                            ) : (
+                                              <Badge variant="outline" className="text-[10px] h-5 text-muted-foreground">No role</Badge>
+                                            )}
+                                          </div>
                                           <div className="grid grid-cols-3 gap-1 text-[11px] pt-1">
                                             <div><span className="text-muted-foreground">D:</span> {u.delivered_at ? new Date(u.delivered_at).toLocaleDateString() : "-"}</div>
                                             <div><span className="text-muted-foreground">R:</span> {u.read_at ? new Date(u.read_at).toLocaleDateString() : "-"}</div>
@@ -654,6 +662,7 @@ const NotificationsPage = () => {
                                         <TableRow>
                                           <TableHead>Name</TableHead>
                                           <TableHead>Mobile</TableHead>
+                                          <TableHead>Role</TableHead>
                                           <TableHead className="w-20">Ward</TableHead>
                                           <TableHead>Delivered</TableHead>
                                           <TableHead>Read</TableHead>
@@ -667,6 +676,13 @@ const NotificationsPage = () => {
                                             <TableRow key={u.user_id}>
                                               <TableCell>{u.full_name || "-"}</TableCell>
                                               <TableCell className="text-xs">{u.mobile_number || "-"}</TableCell>
+                                              <TableCell>
+                                                {u.role_name ? (
+                                                  <Badge variant="secondary" className="text-[10px]">{u.role_name}</Badge>
+                                                ) : (
+                                                  <span className="text-xs text-muted-foreground">—</span>
+                                                )}
+                                              </TableCell>
                                               <TableCell>Ward {u.ward_number ?? "-"}</TableCell>
                                               <TableCell className="text-xs">{u.delivered_at ? new Date(u.delivered_at).toLocaleString() : "-"}</TableCell>
                                               <TableCell className="text-xs">{u.read_at ? new Date(u.read_at).toLocaleString() : "-"}</TableCell>
