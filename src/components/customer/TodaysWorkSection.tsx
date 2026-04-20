@@ -84,7 +84,36 @@ export const TodaysWorkSection = () => {
     })();
   }, [date, agent?.id]);
 
+  // Load month attendance whenever the calendar's visible month changes
+  useEffect(() => {
+    if (!agent) return;
+    (async () => {
+      const r = await callFn({ method: "GET", query: { month: format(monthCursor, "yyyy-MM") } });
+      if (r.ok) setMonthLogs(r.body.logs || []);
+    })();
+  }, [monthCursor, agent?.id]);
+
   const isToday = useMemo(() => ymd(date) === ymd(new Date()), [date]);
+
+  const attendance = useMemo(() => {
+    const today = startOfDay(new Date());
+    const monthStart = startOfMonth(monthCursor);
+    const monthEnd = endOfMonth(monthCursor);
+    // Cap end at today (don't count future days as absent)
+    const end = isAfter(monthEnd, today) ? today : monthEnd;
+    const days = isAfter(monthStart, today) ? [] : eachDayOfInterval({ start: monthStart, end });
+    const presentSet = new Set(monthLogs.map((l) => l.work_date));
+    const presentDays = days.filter((d) => presentSet.has(ymd(d)));
+    const absentDays = days.filter((d) => !presentSet.has(ymd(d)));
+    return { totalDays: days.length, presentDays, absentDays, presentSet };
+  }, [monthLogs, monthCursor]);
+
+  const selectedAttendance = useMemo(() => {
+    const today = startOfDay(new Date());
+    const sel = startOfDay(date);
+    if (isAfter(sel, today)) return "future" as const;
+    return attendance.presentSet.has(ymd(date)) ? "present" as const : "absent" as const;
+  }, [date, attendance.presentSet]);
 
   const handleAdd = async () => {
     if (!draft.trim()) return;
