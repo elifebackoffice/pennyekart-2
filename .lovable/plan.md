@@ -1,26 +1,66 @@
 
-The "Add entry" button fails with "insert failed" when adding a second/multiple entry for the same date. This is happening in the external e-Life Society database, not our local DB.
 
-**Root cause analysis:**
-Looking at `supabase/functions/agent-work-logs/index.ts` POST handler, it inserts into the e-Life `agent_work_logs` table with `(agent_id, work_date, work_details)`. The first insert works, the second fails — this strongly suggests the e-Life table has a **unique constraint on `(agent_id, work_date)`**, allowing only one log per agent per day.
+## Issue: /admin/orders hides seller orders
 
-We cannot modify the external e-Life schema. So the fix must happen in the edge function: when an entry already exists for that `(agent_id, work_date)`, append the new text to the existing record instead of inserting a duplicate row.
+**Root cause:** `OrdersPage.tsx` filters tabs against a hardcoded list of statuses (`pending`, `confirmed`, `processing`, `shipped`, `self_delivery_*`, `delivered`, `cancelled`). Seller orders use statuses that aren't in any tab — so they completely disappear:
+- `seller_confirmation_pending`
+- `seller_accepted`
+- `return_requested`
+- `return_confirmed`
 
-**Plan:**
+The page also has no seller column, no source indicator, and no way to view order details — making it hard to triage seller-related issues.
 
-1. **Update edge function `agent-work-logs` POST handler** to:
-   - First check if a log row already exists for `(agent_id, work_date)`.
-   - If yes → PATCH the existing row, appending the new entry to `work_details` with a timestamp separator (e.g. `\n\n[14:32] new entry text`).
-   - If no → INSERT new row as before.
-   - Return the resulting row so the UI updates correctly.
+## Fix Plan
 
-2. **Update edge function logging** to surface the actual e-Life PostgREST error body in the response (it already does via `details`), and add a `console.error` for debugging.
+Edit `src/pages/admin/OrdersPage.tsx` only. No DB or RLS changes needed (orders RLS already permits admin read).
 
-3. **Verify in `TodaysWorkSection.tsx`** — no UI changes needed; it already re-renders when the returned log comes back. The "multiple entries per day" will now show as a single growing log entry with timestamped sub-entries (which matches how a daily work log naturally reads).
+### 1. Expand tab buckets to cover ALL order statuses
 
-**Alternative considered:** Strict multi-row inserts would require schema changes on the external e-Life DB (drop unique constraint), which is outside our control. The append-strategy preserves all entries and works within the existing constraint.
+```text
+Pending     → pending, seller_confirmation_pending
+Processing  → confirmed, processing, accepted, packed, pickup, shipped,
+              seller_accepted, self_delivery_pickup, self_delivery_shipped
+Delivered   → delivered
+Returns     → return_requested, return_confirmed   (NEW tab)
+Cancelled   → cancelled
+Other       → anything not matched above           (safety net so nothing is ever hidden)
+```
 
-**Files to change:**
-- `supabase/functions/agent-work-logs/index.ts` — POST handler logic (upsert/append)
+A new "Returns" tab is added; an "Other" tab appears only when unknown statuses exist (prevents future regressions).
 
-**No DB migration, no UI changes, no new secrets needed.**
+### 2. Enrich the orders table
+
+Add columns and load supporting data:
+- **Customer** — name + mobile (join via `profiles` by `user_id`)
+- **Seller** — name + "Seller Order" badge when `seller_id` is set OR any item has `source === 'seller_product'`
+- **Items count** — derived from `items` jsonb length
+- Keep existing Order ID, Total, Status, Date
+
+Fetch profile names in a single follow-up query keyed by the union of `user_id`s and `seller_id`s.
+
+### 3. Friendly status labels + color map
+
+Reuse the `STATUS_LABELS` map from the selling-partner dashboard (extend it for return statuses) and a unified `statusColor()` so the admin sees "Confirmed - Awaiting Delivery" instead of raw `seller_accepted`.
+
+### 4. Status dropdown — full list
+
+Expand the `statuses` array used in the update dropdown to include every status above so admins can move seller orders through their lifecycle from this page.
+
+### 5. View Details button
+
+Wire up the existing `OrderDetailDialog` component (already used on partner/delivery dashboards) so admins can open any order, see items, address, and use the "Navigate to Customer" map button.
+
+### 6. Search + Seller filter
+
+Add a small search input (matches order id / customer name / mobile) and a "Show: All / Seller orders / Direct orders" toggle above the tabs for quick triage.
+
+## Files to change
+
+- `src/pages/admin/OrdersPage.tsx` — single-file rewrite implementing the above
+
+## Out of scope
+
+- No schema migration
+- No changes to seller/delivery dashboards
+- No new permissions
+
