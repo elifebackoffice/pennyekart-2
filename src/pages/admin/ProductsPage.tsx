@@ -48,6 +48,8 @@ interface SellerProduct {
   seller_id: string;
   created_at: string;
   margin_percentage?: number | null;
+  is_grocery?: boolean;
+  assign_to_all_micro_godowns?: boolean;
 }
 
 interface Category {
