@@ -83,6 +83,10 @@ const ProductsPage = () => {
   const [ownSearch, setOwnSearch] = useState("");
   const [sellerSearch, setSellerSearch] = useState("");
   const [sellerFilter, setSellerFilter] = useState("");
+  const [sellerGroceryFilter, setSellerGroceryFilter] = useState<"all" | "grocery" | "non_grocery" | "unassigned_grocery">("all");
+  const [microGodownCounts, setMicroGodownCounts] = useState<Record<string, number>>({});
+  const [microGodownTotal, setMicroGodownTotal] = useState(0);
+  const [assignDialog, setAssignDialog] = useState<{ id: string; name: string } | null>(null);
   const [detailProduct, setDetailProduct] = useState<(Product | SellerProduct) | null>(null);
   const [detailType, setDetailType] = useState<"own" | "seller">("own");
   const [detailSellerInfo, setDetailSellerInfo] = useState<{
