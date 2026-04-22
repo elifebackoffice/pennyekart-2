@@ -2,76 +2,56 @@
 
 ## Goal
 
-When a selling partner adds a product under a **grocery** category, admin can assign it to **all** or **selected** micro godowns. Customers only see seller products if their ward maps to one of the assigned micro godowns.
+Two fixes in one pass:
 
-## Current state
+1. Resolve the **build error**: `Cannot find module 'jspdf'` in `SalesReportPage.tsx`.
+2. Make **unassigned grocery seller products** impossible to miss in `/admin/products` so the BIRIYANI MASALA situation (created by partner, invisible to all customers, no signal to admin) doesn't silently happen again.
 
-- `seller_products` has `area_godown_id` (single area-godown link) and is filtered globally — no micro-godown-level visibility control.
-- `useAreaProducts.tsx` already resolves the customer's micro godown(s) via `godown_wards` and area godowns via `godown_local_bodies`, then queries `seller_products` by `area_godown_id`.
-- `categories.category_type` distinguishes `grocery` from other types.
-- Admin Products page (`src/pages/admin/ProductsPage.tsx`) has a Seller Products tab.
+## Verified facts
 
-## Approach
+- `BIRIYANI MASALA ബിരിയാണി മസാല 30g` exists with `is_grocery=true`, `assign_to_all_micro_godowns=false`, **0 rows** in `seller_product_micro_godowns`. So zero customers can see it — by design of the visibility model already shipped.
+- Same is true for 4 other grocery products from seller `0605d859…` (Chicken / Garam / Mandhi / Masala Powder).
+- The customer hook (`useAreaProducts.tsx`) correctly skips these — no bug there.
+- `SalesReportPage.tsx` imports `jspdf` and `jspdf-autotable` but the packages are not in `package.json`, breaking the build.
 
-A many-to-many `seller_product_micro_godowns` link table + admin assignment UI + customer-side visibility filter.
+## Plan
 
-### 1. Database migration
+### 1. Fix build error
 
-**New table** `seller_product_micro_godowns`:
-- `id uuid pk`
-- `seller_product_id uuid not null` → seller_products.id (no FK, indexed)
-- `godown_id uuid not null` → godowns.id (indexed)
-- `created_at timestamptz default now()`
-- Unique `(seller_product_id, godown_id)`
+Add the missing dependencies to `package.json`:
+- `jspdf`
+- `jspdf-autotable`
 
-RLS:
-- SELECT: anyone (public read — needed by customer query)
-- INSERT/UPDATE/DELETE: `is_super_admin() OR has_permission('update_products')`
+(Both are already imported and used in `SalesReportPage.tsx` for PDF export.)
 
-**Helper column** on `seller_products`: `assign_to_all_micro_godowns boolean default false` — when true, product is visible in every micro godown (no link rows needed). Defaults to false so a new grocery seller product is invisible until admin assigns it.
+### 2. Admin UX — surface unassigned grocery items
 
-**Auto-flag trigger** `mark_grocery_seller_product`:
-- BEFORE INSERT/UPDATE OF category on `seller_products`
-- Sets a new `is_grocery boolean` column based on `categories.category_type = 'grocery'` lookup.
-- Used by admin UI to surface only relevant rows in the new "Micro Godown Assignment" view.
+In `src/pages/admin/ProductsPage.tsx` Seller Products tab:
 
-### 2. Admin UI — `src/pages/admin/ProductsPage.tsx` (Seller Products tab)
+a. **Top-of-tab alert banner** (only renders when count > 0):
+   > "⚠️ N grocery product(s) are unassigned and invisible to customers. [Show unassigned]"
+   The button sets `sellerGroceryFilter='unassigned_grocery'`.
 
-- Add a **"Micro Godown"** column showing either "All" badge or a count chip ("3 godowns") for each row.
-- Add a **"Assign Micro Godowns"** action button per row → opens a dialog:
-  - Toggle: **"Assign to all micro godowns"** (writes `assign_to_all_micro_godowns`).
-  - When off: searchable checkbox list of every active `godown_type='micro'` godown, pre-checked from `seller_product_micro_godowns`.
-  - Save: upserts `assign_to_all_micro_godowns` and replaces link rows for that product.
-- Add filter dropdown above the table: **All / Grocery only / Non-grocery / Unassigned grocery** (helps admin find products needing assignment).
+b. **Auto-sort** unassigned grocery rows to the top of the seller products table, regardless of active filter, so admins always see them first.
 
-### 3. Customer-side visibility — `src/hooks/useAreaProducts.tsx`
+c. **Row highlight**: rows where `is_grocery && !assign_to_all_micro_godowns && microGodownCounts[id] === 0` get a soft yellow background + the existing "Unassigned" badge already present.
 
-Update the `seller_products` query:
-- Resolve the customer's micro godown IDs (already computed via `godown_wards` join).
-- Fetch seller products that are EITHER:
-  - `assign_to_all_micro_godowns = true`, OR
-  - present in `seller_product_micro_godowns` for one of the customer's micro godown IDs.
-- Keep existing `is_active`, `is_approved`, `coming_soon`, `stock > 0` filters.
+d. **Tab badge**: add a small red count chip on the "Seller Products" tab trigger showing the unassigned-grocery count, so admins notice it even from the Admin Products tab.
 
-Implementation: two parallel queries (all-flag set + linked rows for customer's micro godowns), merge by id, dedupe.
+### 3. Notify admin on new grocery seller product (lightweight)
 
-### 4. Selling partner side
-
-No code change. Partner creates product as today; visibility defaults to "none" until admin assigns. (Optional follow-up: notify admin on new grocery seller product — out of scope here.)
+When a selling partner creates a product (via their dashboard or admin form) and the resulting row has `is_grocery=true` with no assignment, no extra DB work needed — the new alert + tab badge in step 2 covers discovery. (No notifications-table insert in scope to keep this small.)
 
 ## Files touched
 
-- `supabase/migrations/<new>.sql` — new table, columns, trigger, RLS, backfill
-- `src/pages/admin/ProductsPage.tsx` — column + dialog + filter
-- `src/hooks/useAreaProducts.tsx` — visibility filter rewrite
-- `src/integrations/supabase/types.ts` — auto-regenerated
+- `package.json` — add `jspdf`, `jspdf-autotable`
+- `src/pages/admin/ProductsPage.tsx` — alert banner, row highlight, auto-sort, tab badge
 
 ## Verification
 
-1. Selling partner creates a grocery product → row appears in admin Seller Products with empty Micro Godown column.
-2. Admin opens assignment dialog → picks 2 micro godowns → save.
-3. Customer mapped to one of those micro godowns sees the product on home/category pages.
-4. Customer mapped to a different micro godown does not see it.
-5. Admin toggles "Assign to all" → all customers in any micro godown see it.
-6. Non-grocery seller products continue to behave as today (unaffected).
+1. App builds cleanly (no TS2307).
+2. Open `/admin/products` → Seller Products tab → see banner "5 grocery product(s) unassigned…" and BIRIYANI MASALA row at top with yellow highlight + "Unassigned" badge.
+3. Click "Show unassigned" → table filters to those 5 rows.
+4. Open assign dialog on BIRIYANI MASALA → tick a micro godown → save → row no longer flagged, banner count drops by 1.
+5. Customer in the assigned micro godown's ward now sees BIRIYANI MASALA on home/category pages.
 
