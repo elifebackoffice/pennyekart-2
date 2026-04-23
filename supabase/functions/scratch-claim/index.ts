@@ -281,6 +281,8 @@ serve(async (req) => {
         balance: newBalance,
         reveal_text: card.reveal_text,
         reveal_image_url: card.reveal_image_url,
+        product_link_url: card.product_link_url,
+        product_discount_text: card.product_discount_text,
       });
     }
 

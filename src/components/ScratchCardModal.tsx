@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Trophy, Sparkles, Loader2, Eraser } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { ScratchCard, useScratchCards } from "@/hooks/useScratchCards";
 import { toast } from "@/hooks/use-toast";
@@ -22,6 +23,8 @@ const ScratchCardModal = ({ card, onClose, onClaimed }: Props) => {
     balance: number;
     reveal_text: string | null;
     reveal_image_url: string | null;
+    product_link_url: string | null;
+    product_discount_text: string | null;
   } | null>(null);
   const drawingRef = useRef(false);
   const lastPos = useRef<{ x: number; y: number } | null>(null);
@@ -155,6 +158,8 @@ const ScratchCardModal = ({ card, onClose, onClaimed }: Props) => {
         balance: res.balance,
         reveal_text: res.reveal_text,
         reveal_image_url: res.reveal_image_url,
+        product_link_url: res.product_link_url,
+        product_discount_text: res.product_discount_text,
       });
       onClaimed?.();
       // Fully clear canvas
@@ -306,6 +311,17 @@ const ScratchCardModal = ({ card, onClose, onClaimed }: Props) => {
                       <p className="text-xs mt-2 text-gray-500">
                         Wallet balance: ₹{reward.balance.toFixed(2)}
                       </p>
+                      {reward.product_link_url && (
+                        <a
+                          href={reward.product_link_url}
+                          target={reward.product_link_url.startsWith("http") ? "_blank" : undefined}
+                          rel="noopener noreferrer"
+                          className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold shadow hover:opacity-90 transition"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                          {reward.product_discount_text || "Get Benefit"}
+                        </a>
+                      )}
                     </div>
                   </div>
                 ) : revealing ? (

@@ -32,6 +32,8 @@ interface ScratchCardRow {
   max_claims_per_user: number;
   requires_agent_streak_days: number | null;
   created_at: string;
+  product_link_url: string | null;
+  product_discount_text: string | null;
 }
 
 interface LocalBody {
@@ -113,6 +115,8 @@ const ScratchRewardsPage = () => {
         editing.target_audience === "agents" && editing.requires_agent_streak_days
           ? Math.max(1, Number(editing.requires_agent_streak_days))
           : null,
+      product_link_url: editing.product_link_url || null,
+      product_discount_text: editing.product_discount_text || null,
     };
     const { error } = editing.id
       ? await supabase.from("scratch_cards").update(payload).eq("id", editing.id)
@@ -360,6 +364,29 @@ const ScratchRewardsPage = () => {
               onChange={(url) => setEditing({ ...editing, reveal_image_url: url })}
               label="Reveal image (optional)"
             />
+
+            <div className="border rounded-lg p-3 space-y-3 bg-muted/30">
+              <Label className="font-semibold">Product Link with Special Discount (optional)</Label>
+              <div>
+                <Label>Product URL</Label>
+                <Input
+                  value={editing?.product_link_url || ""}
+                  onChange={(e) => setEditing({ ...editing, product_link_url: e.target.value })}
+                  placeholder="https://example.com/product/123 or /customer/product/abc"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Link to a product page. Customer sees a "Get Benefit" button after scratching.
+                </p>
+              </div>
+              <div>
+                <Label>Discount description</Label>
+                <Input
+                  value={editing?.product_discount_text || ""}
+                  onChange={(e) => setEditing({ ...editing, product_discount_text: e.target.value })}
+                  placeholder="Get 20% off on this product!"
+                />
+              </div>
+            </div>
 
             <div>
               <Label>Target Audience</Label>
