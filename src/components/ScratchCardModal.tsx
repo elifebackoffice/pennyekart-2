@@ -36,41 +36,49 @@ const ScratchCardModal = ({ card, onClose, onClaimed }: Props) => {
   // Initialize scratch overlay
   useEffect(() => {
     if (!card || card.locked) return;
-    const c = canvasRef.current;
-    if (!c) return;
-    const ctx = c.getContext("2d");
-    if (!ctx) return;
-    const w = c.width;
-    const h = c.height;
-    // Blue patterned background like the reference
-    ctx.fillStyle = "#4466EE";
-    ctx.fillRect(0, 0, w, h);
-    // Scattered small confetti/dots pattern
-    ctx.globalAlpha = 0.15;
-    const shapes = ['♦', '●', '▪', '✦', '★'];
-    ctx.font = "10px system-ui";
-    ctx.fillStyle = "#2244BB";
-    for (let i = 0; i < 80; i++) {
-      const sx = Math.random() * w;
-      const sy = Math.random() * h;
-      ctx.fillText(shapes[i % shapes.length], sx, sy);
-    }
-    ctx.globalAlpha = 1.0;
-    // Darker blue circle in center
-    ctx.beginPath();
-    ctx.arc(w / 2, h / 2, 72, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(30, 50, 140, 0.55)";
-    ctx.fill();
-    // Trophy icon (simple cup shape)
-    ctx.fillStyle = "rgba(50, 70, 170, 0.9)";
-    ctx.font = "bold 60px system-ui, sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText("🏆", w / 2, h / 2);
-    // Hint text below
-    ctx.fillStyle = "rgba(255,255,255,0.7)";
-    ctx.font = "bold 14px system-ui, sans-serif";
-    ctx.fillText("Scratch to reveal!", w / 2, h / 2 + 90);
+    const initCanvas = () => {
+      const c = canvasRef.current;
+      if (!c) return;
+      const ctx = c.getContext("2d");
+      if (!ctx) return;
+      const w = c.width;
+      const h = c.height;
+      ctx.fillStyle = "#4466EE";
+      ctx.fillRect(0, 0, w, h);
+      ctx.globalAlpha = 0.15;
+      const shapes = ['♦', '●', '▪', '✦', '★'];
+      ctx.font = "10px system-ui";
+      ctx.fillStyle = "#2244BB";
+      for (let i = 0; i < 80; i++) {
+        const sx = Math.random() * w;
+        const sy = Math.random() * h;
+        ctx.fillText(shapes[i % shapes.length], sx, sy);
+      }
+      ctx.globalAlpha = 1.0;
+      ctx.beginPath();
+      ctx.arc(w / 2, h / 2, 72, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(30, 50, 140, 0.55)";
+      ctx.fill();
+      ctx.fillStyle = "rgba(50, 70, 170, 0.9)";
+      ctx.font = "bold 60px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("🏆", w / 2, h / 2);
+      ctx.fillStyle = "rgba(255,255,255,0.7)";
+      ctx.font = "bold 14px system-ui, sans-serif";
+      ctx.fillText("Scratch to reveal!", w / 2, h / 2 + 90);
+    };
+    // Wait for Dialog to mount the canvas element
+    const raf = requestAnimationFrame(() => {
+      if (canvasRef.current) {
+        initCanvas();
+      } else {
+        // Retry after a short delay if canvas not yet mounted
+        const timer = setTimeout(initCanvas, 150);
+        return () => clearTimeout(timer);
+      }
+    });
+    return () => cancelAnimationFrame(raf);
   }, [card?.id, card?.locked]);
 
   const checkScratchPercent = () => {
