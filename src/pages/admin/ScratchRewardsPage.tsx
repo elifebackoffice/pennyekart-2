@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "@/hooks/use-toast";
 import { Plus, Edit, Trash2, Users, Loader2, Download, Gift } from "lucide-react";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import ImageUpload from "@/components/admin/ImageUpload";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -34,6 +35,7 @@ interface ScratchCardRow {
   created_at: string;
   product_link_url: string | null;
   product_discount_text: string | null;
+  coupon_type?: "amount" | "product";
 }
 
 interface LocalBody {
@@ -86,16 +88,26 @@ const ScratchRewardsPage = () => {
       target_audience: "all",
       target_local_body_ids: [],
       is_active: true,
-      reward_amount: 10,
+      reward_amount: 0,
       max_claims_per_user: 1,
       start_at: now.toISOString(),
       end_at: end.toISOString(),
+      coupon_type: "amount",
     });
   };
 
   const handleSave = async () => {
-    if (!editing?.title || !editing?.reward_amount) {
-      toast({ title: "Title and reward amount required", variant: "destructive" });
+    const cType = editing?.coupon_type || (editing?.product_link_url ? "product" : "amount");
+    if (!editing?.title) {
+      toast({ title: "Title is required", variant: "destructive" });
+      return;
+    }
+    if (cType === "amount" && !editing?.reward_amount) {
+      toast({ title: "Reward amount is required for amount coupon", variant: "destructive" });
+      return;
+    }
+    if (cType === "product" && !editing?.product_link_url) {
+      toast({ title: "Product URL is required for product coupon", variant: "destructive" });
       return;
     }
     const payload = {
@@ -312,24 +324,31 @@ const ScratchRewardsPage = () => {
             <DialogTitle>{editing?.id ? "Edit Scratch Card" : "New Scratch Card"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <Label>Title *</Label>
-                <Input
-                  value={editing?.title || ""}
-                  onChange={(e) => setEditing({ ...editing, title: e.target.value })}
-                  placeholder="Diwali ₹50 reward"
-                />
-              </div>
-              <div>
-                <Label>Reward amount (₹) *</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  value={editing?.reward_amount ?? 0}
-                  onChange={(e) => setEditing({ ...editing, reward_amount: Number(e.target.value) })}
-                />
-              </div>
+            <div>
+              <Label className="font-semibold mb-2 block">Coupon Type *</Label>
+              <RadioGroup
+                value={editing?.coupon_type || (editing?.product_link_url ? "product" : "amount")}
+                onValueChange={(v) => setEditing({ ...editing, coupon_type: v as "amount" | "product" })}
+                className="flex gap-4"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="amount" id="ct-amount" />
+                  <Label htmlFor="ct-amount" className="cursor-pointer">💰 Amount Coupon (wallet reward)</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="product" id="ct-product" />
+                  <Label htmlFor="ct-product" className="cursor-pointer">🛒 Product Coupon (link + discount)</Label>
+                </div>
+              </RadioGroup>
+            </div>
+
+            <div>
+              <Label>Title *</Label>
+              <Input
+                value={editing?.title || ""}
+                onChange={(e) => setEditing({ ...editing, title: e.target.value })}
+                placeholder="Diwali ₹50 reward"
+              />
             </div>
 
             <div>
@@ -366,27 +385,57 @@ const ScratchRewardsPage = () => {
             />
 
             <div className="border rounded-lg p-3 space-y-3 bg-muted/30">
-              <Label className="font-semibold">Product Link with Special Discount (optional)</Label>
-              <div>
-                <Label>Product URL</Label>
-                <Input
-                  value={editing?.product_link_url || ""}
-                  onChange={(e) => setEditing({ ...editing, product_link_url: e.target.value })}
-                  placeholder="https://example.com/product/123 or /customer/product/abc"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Link to a product page. Customer sees a "Get Benefit" button after scratching.
-                </p>
+            {(editing?.coupon_type || (editing?.product_link_url ? "product" : "amount")) === "amount" && (
+              <div className="border rounded-lg p-3 space-y-3 bg-muted/30">
+                <Label className="font-semibold">💰 Wallet Reward</Label>
+                <div>
+                  <Label>Reward amount (₹) *</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={editing?.reward_amount ?? 0}
+                    onChange={(e) => setEditing({ ...editing, reward_amount: Number(e.target.value) })}
+                  />
+                </div>
               </div>
-              <div>
-                <Label>Discount description</Label>
-                <Input
-                  value={editing?.product_discount_text || ""}
-                  onChange={(e) => setEditing({ ...editing, product_discount_text: e.target.value })}
-                  placeholder="Get 20% off on this product!"
-                />
+            )}
+
+            {(editing?.coupon_type || (editing?.product_link_url ? "product" : "amount")) === "product" && (
+              <div className="border rounded-lg p-3 space-y-3 bg-muted/30">
+                <Label className="font-semibold">🛒 Product Link with Special Discount</Label>
+                <div>
+                  <Label>Product URL *</Label>
+                  <Input
+                    value={editing?.product_link_url || ""}
+                    onChange={(e) => setEditing({ ...editing, product_link_url: e.target.value })}
+                    placeholder="https://example.com/product/123 or /customer/product/abc"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Customer sees a "Get Benefit" button after scratching.
+                  </p>
+                </div>
+                <div>
+                  <Label>Discount description</Label>
+                  <Input
+                    value={editing?.product_discount_text || ""}
+                    onChange={(e) => setEditing({ ...editing, product_discount_text: e.target.value })}
+                    placeholder="Get 20% off on this product!"
+                  />
+                </div>
+                <div>
+                  <Label>Bonus wallet amount (₹) — optional</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={editing?.reward_amount ?? 0}
+                    onChange={(e) => setEditing({ ...editing, reward_amount: Number(e.target.value) })}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Leave 0 if no wallet reward; only the product discount applies.
+                  </p>
+                </div>
               </div>
-            </div>
+            )}
 
             <div>
               <Label>Target Audience</Label>
