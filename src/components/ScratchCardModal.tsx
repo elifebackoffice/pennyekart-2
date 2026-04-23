@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Trophy, Sparkles, Loader2 } from "lucide-react";
+import { Trophy, Sparkles, Loader2, Eraser } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
 import { ScratchCard, useScratchCards } from "@/hooks/useScratchCards";
 import { toast } from "@/hooks/use-toast";
 
@@ -25,6 +26,7 @@ const ScratchCardModal = ({ card, onClose, onClaimed }: Props) => {
   const drawingRef = useRef(false);
   const lastPos = useRef<{ x: number; y: number } | null>(null);
   const lastTouchTime = useRef(0);
+  const [brushSize, setBrushSize] = useState(40);
 
   // Attach non-passive touch listeners for mobile scratch support
   useEffect(() => {
@@ -194,7 +196,7 @@ const ScratchCardModal = ({ card, onClose, onClaimed }: Props) => {
     if (!ctx) return;
     ctx.globalCompositeOperation = "destination-out";
     if (lastPos.current) {
-      ctx.lineWidth = 40;
+      ctx.lineWidth = brushSize;
       ctx.lineCap = "round";
       ctx.beginPath();
       ctx.moveTo(lastPos.current.x, lastPos.current.y);
@@ -202,7 +204,7 @@ const ScratchCardModal = ({ card, onClose, onClaimed }: Props) => {
       ctx.stroke();
     }
     ctx.beginPath();
-    ctx.arc(x, y, 22, 0, Math.PI * 2);
+    ctx.arc(x, y, brushSize / 2, 0, Math.PI * 2);
     ctx.fill();
     lastPos.current = { x, y };
   };
@@ -231,6 +233,16 @@ const ScratchCardModal = ({ card, onClose, onClaimed }: Props) => {
       setScratched(true);
       doClaim();
     }
+  };
+
+  const fastReveal = () => {
+    if (scratched || card?.locked || !canvasRef.current) return;
+    const c = canvasRef.current;
+    const ctx = c.getContext("2d");
+    if (!ctx) return;
+    ctx.clearRect(0, 0, c.width, c.height);
+    setScratched(true);
+    doClaim();
   };
 
   if (!card) return null;
@@ -323,7 +335,29 @@ const ScratchCardModal = ({ card, onClose, onClaimed }: Props) => {
             </div>
           )}
 
-          <Button onClick={onClose} className="w-full mt-4" variant={reward ? "default" : "outline"}>
+          {/* Brush size slider & fast reveal - only when scratching */}
+          {!card.locked && !reward && !scratched && (
+            <div className="flex items-center gap-3 mt-3">
+              <div className="flex-1 flex items-center gap-2">
+                <Eraser className="h-4 w-4 text-muted-foreground shrink-0" />
+                <Slider
+                  value={[brushSize]}
+                  onValueChange={(v) => setBrushSize(v[0])}
+                  min={20}
+                  max={80}
+                  step={5}
+                  className="flex-1"
+                />
+                <span className="text-xs text-muted-foreground w-6 text-right">{brushSize}</span>
+              </div>
+              <Button size="sm" variant="secondary" onClick={fastReveal} className="shrink-0">
+                <Sparkles className="h-4 w-4 mr-1" />
+                Reveal
+              </Button>
+            </div>
+          )}
+
+          <Button onClick={onClose} className="w-full mt-3" variant={reward ? "default" : "outline"}>
             {reward ? "Awesome!" : "Close"}
           </Button>
         </div>
