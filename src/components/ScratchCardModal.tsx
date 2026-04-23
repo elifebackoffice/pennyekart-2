@@ -202,7 +202,7 @@ const ScratchCardModal = ({ card, onClose, onClaimed }: Props) => {
               <div className="absolute inset-0 flex flex-col items-center justify-center text-primary-foreground p-6 text-center">
                 {reward ? (
                   <div className="animate-scale-in flex flex-col items-center">
-                    <Sparkles className="h-10 w-10 mb-2 text-yellow-200" />
+                    <Sparkles className="h-10 w-10 mb-2 text-primary-foreground" />
                     <p className="text-sm uppercase tracking-wider opacity-90">You won</p>
                     <p className="text-5xl font-bold my-2">₹{reward.amount}</p>
                     {reward.reveal_text && (
