@@ -324,24 +324,31 @@ const ScratchRewardsPage = () => {
             <DialogTitle>{editing?.id ? "Edit Scratch Card" : "New Scratch Card"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <Label>Title *</Label>
-                <Input
-                  value={editing?.title || ""}
-                  onChange={(e) => setEditing({ ...editing, title: e.target.value })}
-                  placeholder="Diwali ₹50 reward"
-                />
-              </div>
-              <div>
-                <Label>Reward amount (₹) *</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  value={editing?.reward_amount ?? 0}
-                  onChange={(e) => setEditing({ ...editing, reward_amount: Number(e.target.value) })}
-                />
-              </div>
+            <div>
+              <Label className="font-semibold mb-2 block">Coupon Type *</Label>
+              <RadioGroup
+                value={editing?.coupon_type || (editing?.product_link_url ? "product" : "amount")}
+                onValueChange={(v) => setEditing({ ...editing, coupon_type: v as "amount" | "product" })}
+                className="flex gap-4"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="amount" id="ct-amount" />
+                  <Label htmlFor="ct-amount" className="cursor-pointer">💰 Amount Coupon (wallet reward)</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="product" id="ct-product" />
+                  <Label htmlFor="ct-product" className="cursor-pointer">🛒 Product Coupon (link + discount)</Label>
+                </div>
+              </RadioGroup>
+            </div>
+
+            <div>
+              <Label>Title *</Label>
+              <Input
+                value={editing?.title || ""}
+                onChange={(e) => setEditing({ ...editing, title: e.target.value })}
+                placeholder="Diwali ₹50 reward"
+              />
             </div>
 
             <div>
