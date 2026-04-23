@@ -2,56 +2,98 @@
 
 ## Goal
 
-Two fixes in one pass:
+Add a **Scratch & Win** rewards feature (GPay-style) managed from `/admin`, with the same audience targeting as Notifications (All / e-Life Agents / Selected Panchayaths), plus an **agent-only streak reward** based on consecutive days of "Today's Work" entries.
 
-1. Resolve the **build error**: `Cannot find module 'jspdf'` in `SalesReportPage.tsx`.
-2. Make **unassigned grocery seller products** impossible to miss in `/admin/products` so the BIRIYANI MASALA situation (created by partner, invisible to all customers, no signal to admin) doesn't silently happen again.
+## Concept
 
-## Verified facts
+Admin creates **scratch cards**. Each card defines:
+- **Audience** — `all` | `agents` | `panchayath` (with selected local bodies), identical to notifications.
+- **Reward** — wallet credit amount (₹) credited to customer's wallet on scratch.
+- **Visual** — title + subtitle + optional cover image (Cloudinary via existing `ImageUpload`) + optional reveal text/image shown after scratching.
+- **Window** — start/end datetime, active toggle, max claims per user (default 1).
+- **Streak rule (agents only)** — optional: requires N consecutive days of work logs ending today.
 
-- `BIRIYANI MASALA ബിരിയാണി മസാല 30g` exists with `is_grocery=true`, `assign_to_all_micro_godowns=false`, **0 rows** in `seller_product_micro_godowns`. So zero customers can see it — by design of the visibility model already shipped.
-- Same is true for 4 other grocery products from seller `0605d859…` (Chicken / Garam / Mandhi / Masala Powder).
-- The customer hook (`useAreaProducts.tsx`) correctly skips these — no bug there.
-- `SalesReportPage.tsx` imports `jspdf` and `jspdf-autotable` but the packages are not in `package.json`, breaking the build.
+Customers see eligible unscratched cards as a card stack on the home page and on `/customer/profile`. They scratch (canvas overlay erased by drag) → reward animates in → wallet credited via secure edge function.
 
-## Plan
+## Data model (new tables)
 
-### 1. Fix build error
+```text
+scratch_cards
+  id, title, subtitle, cover_image_url, reveal_text, reveal_image_url,
+  reward_amount numeric, target_audience text,
+  target_local_body_ids uuid[], start_at, end_at,
+  is_active bool, max_claims_per_user int default 1,
+  requires_agent_streak_days int null,  -- e.g. 7 = needs 7 consecutive days
+  created_by, created_at, updated_at
 
-Add the missing dependencies to `package.json`:
-- `jspdf`
-- `jspdf-autotable`
+scratch_card_claims
+  id, card_id, user_id, claimed_at, reward_amount, wallet_tx_id
+  unique(card_id, user_id)  -- enforces one claim per card per user
+```
 
-(Both are already imported and used in `SalesReportPage.tsx` for PDF export.)
+RLS:
+- `scratch_cards`: anyone can SELECT active rows; admins (super_admin or `read_settings`) full CRUD.
+- `scratch_card_claims`: user can SELECT/INSERT own; admins SELECT all.
 
-### 2. Admin UX — surface unassigned grocery items
+## Edge function: `scratch-claim`
 
-In `src/pages/admin/ProductsPage.tsx` Seller Products tab:
+Single endpoint that:
+1. Authenticates the caller.
+2. Loads the card; verifies it is active and within its window.
+3. Verifies eligibility:
+   - audience match (re-uses agent check via `pennyekart_agents` like `notifications-resolve`),
+   - claim count under `max_claims_per_user`,
+   - if `requires_agent_streak_days` set → query `agent_work_logs` from e-Life and confirm N consecutive days ending today.
+4. Inserts claim row + wallet credit transaction atomically using service role.
+5. Returns `{ success, reward_amount, balance }`.
 
-a. **Top-of-tab alert banner** (only renders when count > 0):
-   > "⚠️ N grocery product(s) are unassigned and invisible to customers. [Show unassigned]"
-   The button sets `sellerGroceryFilter='unassigned_grocery'`.
+All eligibility logic lives server-side so the client cannot self-credit.
 
-b. **Auto-sort** unassigned grocery rows to the top of the seller products table, regardless of active filter, so admins always see them first.
+## Admin UI — `/admin/scratch-rewards`
 
-c. **Row highlight**: rows where `is_grocery && !assign_to_all_micro_godowns && microGodownCounts[id] === 0` get a soft yellow background + the existing "Unassigned" badge already present.
+New page added to `AdminLayout` sidebar (icon: `Gift`), guarded by `read_settings` permission.
 
-d. **Tab badge**: add a small red count chip on the "Seller Products" tab trigger showing the unassigned-grocery count, so admins notice it even from the Admin Products tab.
+Layout mirrors `NotificationsPage`:
+- Table of cards (Title, Audience, Reward, Window, Status, Claims count, Actions).
+- "New Scratch Card" dialog with: title, subtitle, cover image (`ImageUpload` to `banners` bucket), reveal text/image, reward amount, audience selector (same 3 options + panchayath multi-select), start/end pickers, max claims per user, and an "Agent streak required" numeric input (only visible when audience = `agents`).
+- Per-card "Claims" drawer listing users who claimed (name, mobile, panchayath, claimed_at) with CSV export.
 
-### 3. Notify admin on new grocery seller product (lightweight)
+Route: `/admin/scratch-rewards` registered in `App.tsx`.
 
-When a selling partner creates a product (via their dashboard or admin form) and the resulting row has `is_grocery=true` with no assignment, no extra DB work needed — the new alert + tab badge in step 2 covers discovery. (No notifications-table insert in scope to keep this small.)
+## Customer UI
 
-## Files touched
+New component `ScratchCardWidget`:
+- Fetches eligible cards (`active` + window + audience match + not-yet-claimed-by-me) via a small RPC or filtered select using the same audience filter as notifications.
+- Renders a horizontal swipable stack on the home page (above `Categories`) and a section in `/customer/profile`.
+- Tapping a card opens a fullscreen modal with a `<canvas>` scratch overlay (drag to erase). When >60 % erased it auto-completes, calls `scratch-claim`, plays a confetti animation, shows reward + reveal text/image, and refreshes the wallet balance.
+- Once claimed, the card disappears from the stack.
 
-- `package.json` — add `jspdf`, `jspdf-autotable`
-- `src/pages/admin/ProductsPage.tsx` — alert banner, row highlight, auto-sort, tab badge
+For the agent streak case: ineligible streak cards are still shown (greyed) with progress text "5 / 7 days streak — keep going!" so agents are motivated. Streak progress is computed by reusing `agent-work-logs` GET (`?month=`) and counting consecutive days ending today.
+
+## Files
+
+New
+- `supabase/functions/scratch-claim/index.ts`
+- `src/pages/admin/ScratchRewardsPage.tsx`
+- `src/components/ScratchCardWidget.tsx`
+- `src/components/ScratchCardModal.tsx` (canvas + scratch logic)
+- `src/hooks/useScratchCards.tsx`
+
+Edited
+- `src/App.tsx` — register `/admin/scratch-rewards` route.
+- `src/components/admin/AdminLayout.tsx` — add sidebar entry.
+- `src/pages/Index.tsx` and `src/pages/customer/Profile.tsx` — mount `<ScratchCardWidget />`.
+
+## Database changes
+
+Migration creates the two tables, indexes (`card_id, user_id`), and RLS policies described above. No changes to existing tables.
 
 ## Verification
 
-1. App builds cleanly (no TS2307).
-2. Open `/admin/products` → Seller Products tab → see banner "5 grocery product(s) unassigned…" and BIRIYANI MASALA row at top with yellow highlight + "Unassigned" badge.
-3. Click "Show unassigned" → table filters to those 5 rows.
-4. Open assign dialog on BIRIYANI MASALA → tick a micro godown → save → row no longer flagged, banner count drops by 1.
-5. Customer in the assigned micro godown's ward now sees BIRIYANI MASALA on home/category pages.
+1. Admin → `/admin/scratch-rewards` → create "Diwali ₹50 reward" targeted to "All Users" → save.
+2. Customer home page shows the card → scratches → wallet credited ₹50, transaction logged, card disappears.
+3. Create a card targeted to a specific panchayath → only customers in that local body see it.
+4. Create an agents-only card with `requires_agent_streak_days = 7` → an agent with <7 consecutive work-log days sees a locked card with progress; once they complete 7 in a row, it unlocks and is claimable.
+5. Re-claim attempts return "already claimed". A non-targeted user calling `scratch-claim` directly is rejected with 403.
+6. Admin claims drawer shows the claimant list with CSV export.
 
