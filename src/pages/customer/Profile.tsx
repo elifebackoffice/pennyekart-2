@@ -17,6 +17,7 @@ import { TodaysWorkSection } from "@/components/customer/TodaysWorkSection";
 import { useNotifications } from "@/hooks/useNotifications";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import NotificationDetailDialog from "@/components/NotificationDetailDialog";
+import ScratchCardWidget from "@/components/ScratchCardWidget";
 
 interface Order {
   id: string;
@@ -421,6 +422,9 @@ const Profile = () => {
 
         {/* Today's Work — only renders for users matched as a Pennyekart agent in e-Life */}
         {activeSection === "profile" && <TodaysWorkSection />}
+
+        {/* Scratch & Win rewards */}
+        {activeSection === "profile" && <ScratchCardWidget className="px-0" />}
 
         {/* Orders Section */}
         {activeSection === "orders" && (

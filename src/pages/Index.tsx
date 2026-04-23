@@ -12,6 +12,7 @@ import Footer from "@/components/Footer";
 import CartReminderBanner from "@/components/CartReminderBanner";
 import WalletRewardPopup from "@/components/WalletRewardPopup";
 import OfferFlashPopup from "@/components/OfferFlashPopup";
+import ScratchCardWidget from "@/components/ScratchCardWidget";
 import SortFilterBar, { SortOption } from "@/components/SortFilterBar";
 import { useAuth } from "@/hooks/useAuth";
 import { useAreaProducts } from "@/hooks/useAreaProducts";
@@ -267,6 +268,7 @@ const Index = () => {
         <CategoryBar onCategoryClick={handleCategoryClick} selectedCategory={selectedCategory} />
         <SortFilterBar selected={sortBy} onChange={setSortBy} />
         <BannerCarousel />
+        <ScratchCardWidget />
         <GroceryCategories onCategoryClick={handleCategoryClick} selectedCategory={selectedCategory} />
         {renderSectionProducts()}
       </main>
