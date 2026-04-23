@@ -25,6 +25,49 @@ const ScratchCardModal = ({ card, onClose, onClaimed }: Props) => {
   const drawingRef = useRef(false);
   const lastPos = useRef<{ x: number; y: number } | null>(null);
 
+  // Attach non-passive touch listeners for mobile scratch support
+  useEffect(() => {
+    const c = canvasRef.current;
+    if (!c || card?.locked || reward) return;
+
+    const getTouchXY = (e: TouchEvent) => {
+      const rect = c.getBoundingClientRect();
+      const scaleX = c.width / rect.width;
+      const scaleY = c.height / rect.height;
+      const t = e.touches[0] ?? e.changedTouches[0];
+      return { x: (t.clientX - rect.left) * scaleX, y: (t.clientY - rect.top) * scaleY };
+    };
+
+    const handleTouchStart = (e: TouchEvent) => {
+      e.preventDefault();
+      if (scratched) return;
+      drawingRef.current = true;
+      lastPos.current = null;
+      const { x, y } = getTouchXY(e);
+      scratchAt(x, y);
+    };
+    const handleTouchMove = (e: TouchEvent) => {
+      e.preventDefault();
+      if (!drawingRef.current) return;
+      const { x, y } = getTouchXY(e);
+      scratchAt(x, y);
+    };
+    const handleTouchEnd = (e: TouchEvent) => {
+      e.preventDefault();
+      onEnd();
+    };
+
+    c.addEventListener("touchstart", handleTouchStart, { passive: false });
+    c.addEventListener("touchmove", handleTouchMove, { passive: false });
+    c.addEventListener("touchend", handleTouchEnd, { passive: false });
+
+    return () => {
+      c.removeEventListener("touchstart", handleTouchStart);
+      c.removeEventListener("touchmove", handleTouchMove);
+      c.removeEventListener("touchend", handleTouchEnd);
+    };
+  });
+
   useEffect(() => {
     if (!card) {
       setScratched(false);
@@ -271,9 +314,6 @@ const ScratchCardModal = ({ card, onClose, onClaimed }: Props) => {
                   onMouseMove={onMove}
                   onMouseUp={onEnd}
                   onMouseLeave={onEnd}
-                  onTouchStart={onStart}
-                  onTouchMove={onMove}
-                  onTouchEnd={onEnd}
                 />
               )}
             </div>
