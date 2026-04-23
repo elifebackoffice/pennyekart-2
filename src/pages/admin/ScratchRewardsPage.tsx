@@ -35,6 +35,7 @@ interface ScratchCardRow {
   created_at: string;
   product_link_url: string | null;
   product_discount_text: string | null;
+  coupon_type?: "amount" | "product";
 }
 
 interface LocalBody {
