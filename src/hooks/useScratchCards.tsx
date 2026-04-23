@@ -20,6 +20,8 @@ export interface ScratchCard {
   streak_progress: number | null;
   streak_required: number | null;
   locked: boolean;
+  product_link_url: string | null;
+  product_discount_text: string | null;
 }
 
 export const useScratchCards = () => {
@@ -70,6 +72,8 @@ export const useScratchCards = () => {
         balance: number;
         reveal_text: string | null;
         reveal_image_url: string | null;
+        product_link_url: string | null;
+        product_discount_text: string | null;
       };
     },
     [session?.access_token],
