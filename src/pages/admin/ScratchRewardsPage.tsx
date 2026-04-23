@@ -88,16 +88,26 @@ const ScratchRewardsPage = () => {
       target_audience: "all",
       target_local_body_ids: [],
       is_active: true,
-      reward_amount: 10,
+      reward_amount: 0,
       max_claims_per_user: 1,
       start_at: now.toISOString(),
       end_at: end.toISOString(),
+      coupon_type: "amount",
     });
   };
 
   const handleSave = async () => {
-    if (!editing?.title || !editing?.reward_amount) {
-      toast({ title: "Title and reward amount required", variant: "destructive" });
+    const cType = editing?.coupon_type || (editing?.product_link_url ? "product" : "amount");
+    if (!editing?.title) {
+      toast({ title: "Title is required", variant: "destructive" });
+      return;
+    }
+    if (cType === "amount" && !editing?.reward_amount) {
+      toast({ title: "Reward amount is required for amount coupon", variant: "destructive" });
+      return;
+    }
+    if (cType === "product" && !editing?.product_link_url) {
+      toast({ title: "Product URL is required for product coupon", variant: "destructive" });
       return;
     }
     const payload = {
