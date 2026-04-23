@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "@/hooks/use-toast";
 import { Plus, Edit, Trash2, Users, Loader2, Download, Gift } from "lucide-react";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import ImageUpload from "@/components/admin/ImageUpload";
 import { useAuth } from "@/hooks/useAuth";
 
