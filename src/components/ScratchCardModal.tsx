@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Gift, Sparkles, Loader2 } from "lucide-react";
+import { Trophy, Sparkles, Loader2 } from "lucide-react";
 import { ScratchCard, useScratchCards } from "@/hooks/useScratchCards";
 import { toast } from "@/hooks/use-toast";
 
@@ -42,20 +42,35 @@ const ScratchCardModal = ({ card, onClose, onClaimed }: Props) => {
     if (!ctx) return;
     const w = c.width;
     const h = c.height;
-    // Silver gradient overlay
-    const g = ctx.createLinearGradient(0, 0, w, h);
-    g.addColorStop(0, "#c0c0c0");
-    g.addColorStop(0.5, "#9ca3af");
-    g.addColorStop(1, "#6b7280");
-    ctx.fillStyle = g;
+    // Blue patterned background like the reference
+    ctx.fillStyle = "#4466EE";
     ctx.fillRect(0, 0, w, h);
-    // Hint text
-    ctx.fillStyle = "rgba(255,255,255,0.85)";
-    ctx.font = "bold 20px system-ui, sans-serif";
+    // Scattered small confetti/dots pattern
+    ctx.globalAlpha = 0.15;
+    const shapes = ['♦', '●', '▪', '✦', '★'];
+    ctx.font = "10px system-ui";
+    ctx.fillStyle = "#2244BB";
+    for (let i = 0; i < 80; i++) {
+      const sx = Math.random() * w;
+      const sy = Math.random() * h;
+      ctx.fillText(shapes[i % shapes.length], sx, sy);
+    }
+    ctx.globalAlpha = 1.0;
+    // Darker blue circle in center
+    ctx.beginPath();
+    ctx.arc(w / 2, h / 2, 72, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(30, 50, 140, 0.55)";
+    ctx.fill();
+    // Trophy icon (simple cup shape)
+    ctx.fillStyle = "rgba(50, 70, 170, 0.9)";
+    ctx.font = "bold 60px system-ui, sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("Scratch here!", w / 2, h / 2 - 4);
-    ctx.font = "14px system-ui, sans-serif";
-    ctx.fillText("Drag to reveal your reward", w / 2, h / 2 + 22);
+    ctx.textBaseline = "middle";
+    ctx.fillText("🏆", w / 2, h / 2);
+    // Hint text below
+    ctx.fillStyle = "rgba(255,255,255,0.7)";
+    ctx.font = "bold 14px system-ui, sans-serif";
+    ctx.fillText("Scratch to reveal!", w / 2, h / 2 + 90);
   }, [card?.id, card?.locked]);
 
   const checkScratchPercent = () => {
@@ -178,8 +193,8 @@ const ScratchCardModal = ({ card, onClose, onClaimed }: Props) => {
           </div>
 
           {card.locked ? (
-            <div className="aspect-square rounded-2xl bg-muted/40 flex flex-col items-center justify-center p-6 text-center border-2 border-dashed border-muted-foreground/30">
-              <Gift className="h-12 w-12 text-muted-foreground mb-3" />
+            <div className="aspect-square rounded-2xl bg-muted/40 flex flex-col items-center justify-center p-6 text-center border-2 border-dashed border-muted-foreground/30">  
+              <Trophy className="h-12 w-12 text-muted-foreground mb-3" />
               <p className="font-semibold text-base">Keep your streak going!</p>
               <p className="text-sm text-muted-foreground mt-2">
                 {card.streak_progress} / {card.streak_required} consecutive days completed
@@ -197,35 +212,42 @@ const ScratchCardModal = ({ card, onClose, onClaimed }: Props) => {
               </p>
             </div>
           ) : (
-            <div className="relative aspect-square rounded-2xl overflow-hidden bg-gradient-to-br from-primary to-accent shadow-xl">
+            <div className="relative aspect-square rounded-2xl overflow-hidden shadow-xl" style={{ background: '#4466EE' }}>
               {/* Reward layer (under canvas) */}
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-primary-foreground p-6 text-center">
+              <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center">
                 {reward ? (
-                  <div className="animate-scale-in flex flex-col items-center">
-                    <Sparkles className="h-10 w-10 mb-2 text-primary-foreground" />
-                    <p className="text-sm uppercase tracking-wider opacity-90">You won</p>
-                    <p className="text-5xl font-bold my-2">₹{reward.amount}</p>
-                    {reward.reveal_text && (
-                      <p className="text-sm mt-2 opacity-90">{reward.reveal_text}</p>
-                    )}
-                    {reward.reveal_image_url && (
-                      <img
-                        src={reward.reveal_image_url}
-                        alt=""
-                        className="mt-3 max-h-24 rounded-lg"
-                      />
-                    )}
-                    <p className="text-xs mt-3 opacity-75">
-                      Wallet balance: ₹{reward.balance.toFixed(2)}
-                    </p>
+                  <div className="animate-scale-in flex flex-col items-center relative">
+                    {/* Cloud-like white reveal shape */}
+                    <div className="absolute inset-0 -m-8 rounded-[50%] bg-white/90 blur-md" />
+                    <div className="relative flex flex-col items-center z-10">
+                      {/* Dark circle with trophy */}
+                      <div className="w-28 h-28 rounded-full bg-[#1a1a3e] flex items-center justify-center mb-3 shadow-lg">
+                        <span className="text-5xl">🏆</span>
+                      </div>
+                      <p className="text-lg font-bold text-gray-800">You've won</p>
+                      <p className="text-4xl font-extrabold text-gray-900 my-1">₹{reward.amount}</p>
+                      {reward.reveal_text && (
+                        <p className="text-sm mt-1 text-gray-600">{reward.reveal_text}</p>
+                      )}
+                      {reward.reveal_image_url && (
+                        <img
+                          src={reward.reveal_image_url}
+                          alt=""
+                          className="mt-2 max-h-20 rounded-lg"
+                        />
+                      )}
+                      <p className="text-xs mt-2 text-gray-500">
+                        Wallet balance: ₹{reward.balance.toFixed(2)}
+                      </p>
+                    </div>
                   </div>
                 ) : revealing ? (
-                  <Loader2 className="h-10 w-10 animate-spin" />
+                  <Loader2 className="h-10 w-10 animate-spin text-white" />
                 ) : (
                   <>
-                    <Gift className="h-12 w-12 mb-3" />
-                    <p className="text-2xl font-bold">₹{card.reward_amount}</p>
-                    <p className="text-sm mt-1 opacity-90">Scratch to claim</p>
+                    <Trophy className="h-12 w-12 mb-3 text-white/80" />
+                    <p className="text-2xl font-bold text-white">₹{card.reward_amount}</p>
+                    <p className="text-sm mt-1 text-white/80">Scratch to claim</p>
                   </>
                 )}
               </div>
