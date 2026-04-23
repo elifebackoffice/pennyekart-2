@@ -1,99 +1,41 @@
 
 
-## Goal
+## Fix the Scratch Rewards admin page
 
-Add a **Scratch & Win** rewards feature (GPay-style) managed from `/admin`, with the same audience targeting as Notifications (All / e-Life Agents / Selected Panchayaths), plus an **agent-only streak reward** based on consecutive days of "Today's Work" entries.
+### Problem
 
-## Concept
+`src/pages/admin/ScratchRewardsPage.tsx` has a stray opening `<div>` on line 387 that is never closed:
 
-Admin creates **scratch cards**. Each card defines:
-- **Audience** — `all` | `agents` | `panchayath` (with selected local bodies), identical to notifications.
-- **Reward** — wallet credit amount (₹) credited to customer's wallet on scratch.
-- **Visual** — title + subtitle + optional cover image (Cloudinary via existing `ImageUpload`) + optional reveal text/image shown after scratching.
-- **Window** — start/end datetime, active toggle, max claims per user (default 1).
-- **Streak rule (agents only)** — optional: requires N consecutive days of work logs ending today.
-
-Customers see eligible unscratched cards as a card stack on the home page and on `/customer/profile`. They scratch (canvas overlay erased by drag) → reward animates in → wallet credited via secure edge function.
-
-## Data model (new tables)
-
-```text
-scratch_cards
-  id, title, subtitle, cover_image_url, reveal_text, reveal_image_url,
-  reward_amount numeric, target_audience text,
-  target_local_body_ids uuid[], start_at, end_at,
-  is_active bool, max_claims_per_user int default 1,
-  requires_agent_streak_days int null,  -- e.g. 7 = needs 7 consecutive days
-  created_by, created_at, updated_at
-
-scratch_card_claims
-  id, card_id, user_id, claimed_at, reward_amount, wallet_tx_id
-  unique(card_id, user_id)  -- enforces one claim per card per user
+```tsx
+387:  <div className="border rounded-lg p-3 space-y-3 bg-muted/30">
+388:  {(editing?.coupon_type || ...) === "amount" && (
+389:    <div className="border rounded-lg p-3 space-y-3 bg-muted/30">
 ```
 
-RLS:
-- `scratch_cards`: anyone can SELECT active rows; admins (super_admin or `read_settings`) full CRUD.
-- `scratch_card_claims`: user can SELECT/INSERT own; admins SELECT all.
+That wrapper duplicates the inner conditional wrappers and leaves the dialog body's JSX structure unbalanced, which is why "New Scratch Card" / "Edit" appears broken (blank dialog, layout collapse, or runtime error depending on the browser).
 
-## Edge function: `scratch-claim`
+A secondary access issue: the route and sidebar entry both require the `read_settings` permission. A logged-in admin who is not a super admin and lacks that permission will be silently redirected away from the page — making it look like "the page doesn't work".
 
-Single endpoint that:
-1. Authenticates the caller.
-2. Loads the card; verifies it is active and within its window.
-3. Verifies eligibility:
-   - audience match (re-uses agent check via `pennyekart_agents` like `notifications-resolve`),
-   - claim count under `max_claims_per_user`,
-   - if `requires_agent_streak_days` set → query `agent_work_logs` from e-Life and confirm N consecutive days ending today.
-4. Inserts claim row + wallet credit transaction atomically using service role.
-5. Returns `{ success, reward_amount, balance }`.
+### Fix
 
-All eligibility logic lives server-side so the client cannot self-credit.
+1. **Remove the stray opening `<div>`** on line 387 of `ScratchRewardsPage.tsx`. The two coupon-type branches (Amount / Product) already have their own bordered wrapper, so no extra container is needed.
 
-## Admin UI — `/admin/scratch-rewards`
+2. **Confirm permission gating works** — verify the current admin account either has `is_super_admin = true` or the `read_settings` permission. The route and sidebar already guard on `read_settings`; no code change needed unless you want to broaden access (e.g. add a dedicated `manage_scratch_rewards` permission). I will leave the existing guard in place.
 
-New page added to `AdminLayout` sidebar (icon: `Gift`), guarded by `read_settings` permission.
+3. **No database, edge function, or other file changes** are required. The `scratch_cards` / `scratch_card_claims` tables and the `scratch-claim` edge function are already deployed and healthy (logs show normal boot/shutdown cycles, no errors).
 
-Layout mirrors `NotificationsPage`:
-- Table of cards (Title, Audience, Reward, Window, Status, Claims count, Actions).
-- "New Scratch Card" dialog with: title, subtitle, cover image (`ImageUpload` to `banners` bucket), reveal text/image, reward amount, audience selector (same 3 options + panchayath multi-select), start/end pickers, max claims per user, and an "Agent streak required" numeric input (only visible when audience = `agents`).
-- Per-card "Claims" drawer listing users who claimed (name, mobile, panchayath, claimed_at) with CSV export.
+### Files touched
 
-Route: `/admin/scratch-rewards` registered in `App.tsx`.
+- `src/pages/admin/ScratchRewardsPage.tsx` — delete one extra `<div>` opening tag (1-line edit).
 
-## Customer UI
+### Verification after fix
 
-New component `ScratchCardWidget`:
-- Fetches eligible cards (`active` + window + audience match + not-yet-claimed-by-me) via a small RPC or filtered select using the same audience filter as notifications.
-- Renders a horizontal swipable stack on the home page (above `Categories`) and a section in `/customer/profile`.
-- Tapping a card opens a fullscreen modal with a `<canvas>` scratch overlay (drag to erase). When >60 % erased it auto-completes, calls `scratch-claim`, plays a confetti animation, shows reward + reveal text/image, and refreshes the wallet balance.
-- Once claimed, the card disappears from the stack.
+1. Open `/admin/scratch-rewards` → table renders.
+2. Click **New Scratch Card** → dialog opens fully with Coupon Type radio, Title, Subtitle, images, Amount/Product branch (only one visible at a time), audience selector, dates, max claims, Active switch.
+3. Save an "All Users" amount card → row appears in the table with Live/Scheduled badge.
+4. Click the Users icon on a card → Claims dialog loads via the `scratch-claim` edge function.
 
-For the agent streak case: ineligible streak cards are still shown (greyed) with progress text "5 / 7 days streak — keep going!" so agents are motivated. Streak progress is computed by reusing `agent-work-logs` GET (`?month=`) and counting consecutive days ending today.
+### If the page still shows blank after the fix
 
-## Files
-
-New
-- `supabase/functions/scratch-claim/index.ts`
-- `src/pages/admin/ScratchRewardsPage.tsx`
-- `src/components/ScratchCardWidget.tsx`
-- `src/components/ScratchCardModal.tsx` (canvas + scratch logic)
-- `src/hooks/useScratchCards.tsx`
-
-Edited
-- `src/App.tsx` — register `/admin/scratch-rewards` route.
-- `src/components/admin/AdminLayout.tsx` — add sidebar entry.
-- `src/pages/Index.tsx` and `src/pages/customer/Profile.tsx` — mount `<ScratchCardWidget />`.
-
-## Database changes
-
-Migration creates the two tables, indexes (`card_id, user_id`), and RLS policies described above. No changes to existing tables.
-
-## Verification
-
-1. Admin → `/admin/scratch-rewards` → create "Diwali ₹50 reward" targeted to "All Users" → save.
-2. Customer home page shows the card → scratches → wallet credited ₹50, transaction logged, card disappears.
-3. Create a card targeted to a specific panchayath → only customers in that local body see it.
-4. Create an agents-only card with `requires_agent_streak_days = 7` → an agent with <7 consecutive work-log days sees a locked card with progress; once they complete 7 in a row, it unlocks and is claimable.
-5. Re-claim attempts return "already claimed". A non-targeted user calling `scratch-claim` directly is rejected with 403.
-6. Admin claims drawer shows the claimant list with CSV export.
+Most likely cause is the permission guard. Tell me which admin user you're testing with and I'll either grant `read_settings` to that role or relax the guard.
 
