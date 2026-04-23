@@ -385,27 +385,57 @@ const ScratchRewardsPage = () => {
             />
 
             <div className="border rounded-lg p-3 space-y-3 bg-muted/30">
-              <Label className="font-semibold">Product Link with Special Discount (optional)</Label>
-              <div>
-                <Label>Product URL</Label>
-                <Input
-                  value={editing?.product_link_url || ""}
-                  onChange={(e) => setEditing({ ...editing, product_link_url: e.target.value })}
-                  placeholder="https://example.com/product/123 or /customer/product/abc"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Link to a product page. Customer sees a "Get Benefit" button after scratching.
-                </p>
+            {(editing?.coupon_type || (editing?.product_link_url ? "product" : "amount")) === "amount" && (
+              <div className="border rounded-lg p-3 space-y-3 bg-muted/30">
+                <Label className="font-semibold">💰 Wallet Reward</Label>
+                <div>
+                  <Label>Reward amount (₹) *</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={editing?.reward_amount ?? 0}
+                    onChange={(e) => setEditing({ ...editing, reward_amount: Number(e.target.value) })}
+                  />
+                </div>
               </div>
-              <div>
-                <Label>Discount description</Label>
-                <Input
-                  value={editing?.product_discount_text || ""}
-                  onChange={(e) => setEditing({ ...editing, product_discount_text: e.target.value })}
-                  placeholder="Get 20% off on this product!"
-                />
+            )}
+
+            {(editing?.coupon_type || (editing?.product_link_url ? "product" : "amount")) === "product" && (
+              <div className="border rounded-lg p-3 space-y-3 bg-muted/30">
+                <Label className="font-semibold">🛒 Product Link with Special Discount</Label>
+                <div>
+                  <Label>Product URL *</Label>
+                  <Input
+                    value={editing?.product_link_url || ""}
+                    onChange={(e) => setEditing({ ...editing, product_link_url: e.target.value })}
+                    placeholder="https://example.com/product/123 or /customer/product/abc"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Customer sees a "Get Benefit" button after scratching.
+                  </p>
+                </div>
+                <div>
+                  <Label>Discount description</Label>
+                  <Input
+                    value={editing?.product_discount_text || ""}
+                    onChange={(e) => setEditing({ ...editing, product_discount_text: e.target.value })}
+                    placeholder="Get 20% off on this product!"
+                  />
+                </div>
+                <div>
+                  <Label>Bonus wallet amount (₹) — optional</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={editing?.reward_amount ?? 0}
+                    onChange={(e) => setEditing({ ...editing, reward_amount: Number(e.target.value) })}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Leave 0 if no wallet reward; only the product discount applies.
+                  </p>
+                </div>
               </div>
-            </div>
+            )}
 
             <div>
               <Label>Target Audience</Label>
