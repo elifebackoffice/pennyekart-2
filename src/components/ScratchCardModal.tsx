@@ -24,6 +24,7 @@ const ScratchCardModal = ({ card, onClose, onClaimed }: Props) => {
   } | null>(null);
   const drawingRef = useRef(false);
   const lastPos = useRef<{ x: number; y: number } | null>(null);
+  const lastTouchTime = useRef(0);
 
   // Attach non-passive touch listeners for mobile scratch support
   useEffect(() => {
@@ -49,6 +50,9 @@ const ScratchCardModal = ({ card, onClose, onClaimed }: Props) => {
     const handleTouchMove = (e: TouchEvent) => {
       e.preventDefault();
       if (!drawingRef.current) return;
+      const now = performance.now();
+      if (now - lastTouchTime.current < 16) return;
+      lastTouchTime.current = now;
       const { x, y } = getTouchXY(e);
       scratchAt(x, y);
     };
