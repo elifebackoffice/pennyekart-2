@@ -320,6 +320,7 @@ const NotificationsPage = () => {
                   <TableHead>Title</TableHead>
                   <TableHead>Target</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead className="text-center">Views</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
