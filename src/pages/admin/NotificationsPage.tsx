@@ -538,25 +538,26 @@ const NotificationsPage = () => {
                 <Card><CardHeader className="pb-2 px-3 sm:px-6"><CardTitle className="text-xs sm:text-sm">Clicked</CardTitle></CardHeader><CardContent className="px-3 sm:px-6"><p className="text-xl sm:text-2xl font-bold text-emerald-600">{analytics.totals.clicked}</p></CardContent></Card>
               </div>
 
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 sm:flex-wrap">
                 <Select value={filterPanchayath} onValueChange={setFilterPanchayath}>
-                  <SelectTrigger className="flex-1 min-w-[140px] h-9"><SelectValue placeholder="Panchayath" /></SelectTrigger>
+                  <SelectTrigger className="sm:flex-1 sm:min-w-[140px] h-9 text-xs sm:text-sm"><SelectValue placeholder="Panchayath" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Panchayaths</SelectItem>
                     {uniquePanchayaths.map((p: any) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={filterWard} onValueChange={setFilterWard}>
-                  <SelectTrigger className="w-28 h-9"><SelectValue placeholder="Ward" /></SelectTrigger>
+                  <SelectTrigger className="sm:w-28 h-9 text-xs sm:text-sm"><SelectValue placeholder="Ward" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Wards</SelectItem>
                     {uniqueWards.map((w: any) => <SelectItem key={w} value={String(w)}>Ward {w}</SelectItem>)}
                   </SelectContent>
                 </Select>
-                <Button size="sm" variant="outline" onClick={exportGroupsCSV} className="h-9">
-                  <Download className="h-4 w-4 sm:mr-1" /> <span className="hidden sm:inline">Export</span>
+                <Button size="sm" variant="outline" onClick={exportGroupsCSV} className="h-9 col-span-2 sm:col-span-1">
+                  <Download className="h-4 w-4 mr-1" /> Export
                 </Button>
               </div>
+
 
               <Accordion type="multiple" className="w-full">
                 <AccordionItem value="by-panchayath">
