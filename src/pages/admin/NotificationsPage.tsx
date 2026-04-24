@@ -575,8 +575,8 @@ const NotificationsPage = () => {
                           return (
                             <AccordionItem key={panchayath} value={panchayath} className="border rounded-md px-3">
                               <AccordionTrigger className="hover:no-underline py-3">
-                                <div className="flex-1 flex items-center justify-between gap-2 pr-2 min-w-0">
-                                  <span className="font-medium text-sm sm:text-base truncate text-left">{panchayath}</span>
+                                <div className="flex-1 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 sm:gap-2 pr-2 min-w-0 text-left">
+                                  <span className="font-medium text-sm sm:text-base truncate">{panchayath}</span>
                                   <div className="flex items-center gap-1.5 text-xs shrink-0">
                                     <Badge variant="outline" className="font-normal">D {subtotal.d}</Badge>
                                     <Badge variant="outline" className="font-normal text-primary border-primary/40">R {subtotal.r}</Badge>
@@ -595,7 +595,31 @@ const NotificationsPage = () => {
                                     <MessageCircle className="h-3.5 w-3.5 mr-1" /> Share to WhatsApp
                                   </Button>
                                 </div>
-                                <div className="overflow-x-auto">
+                                {/* Mobile: card list */}
+                                <div className="sm:hidden space-y-2">
+                                  {[...groups]
+                                    .sort((a: any, b: any) => (Number(a.ward_number) || 0) - (Number(b.ward_number) || 0))
+                                    .map((g: any, i: number) => (
+                                      <div key={`m-${panchayath}-${i}`} className="border rounded-md p-2.5 text-sm flex items-center justify-between gap-2">
+                                        <span className="font-medium">Ward {g.ward_number ?? "-"}</span>
+                                        <div className="flex items-center gap-1.5 text-xs shrink-0">
+                                          <Badge variant="outline" className="font-normal">D {g.delivered}</Badge>
+                                          <Badge variant="outline" className="font-normal text-primary border-primary/40">R {g.read}</Badge>
+                                          <Badge variant="outline" className="font-normal text-emerald-600 border-emerald-600/40">C {g.clicked}</Badge>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  <div className="border rounded-md p-2.5 text-sm flex items-center justify-between gap-2 bg-muted/40">
+                                    <span className="font-semibold text-xs">Subtotal</span>
+                                    <div className="flex items-center gap-1.5 text-xs shrink-0">
+                                      <Badge variant="outline" className="font-semibold">D {subtotal.d}</Badge>
+                                      <Badge variant="outline" className="font-semibold text-primary border-primary/40">R {subtotal.r}</Badge>
+                                      <Badge variant="outline" className="font-semibold text-emerald-600 border-emerald-600/40">C {subtotal.c}</Badge>
+                                    </div>
+                                  </div>
+                                </div>
+                                {/* Desktop: table */}
+                                <div className="hidden sm:block overflow-x-auto">
                                   <Table>
                                     <TableHeader>
                                       <TableRow>
@@ -627,6 +651,7 @@ const NotificationsPage = () => {
                                 </div>
                               </AccordionContent>
                             </AccordionItem>
+
                           );
                         })}
                       </Accordion>
