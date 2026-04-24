@@ -538,25 +538,26 @@ const NotificationsPage = () => {
                 <Card><CardHeader className="pb-2 px-3 sm:px-6"><CardTitle className="text-xs sm:text-sm">Clicked</CardTitle></CardHeader><CardContent className="px-3 sm:px-6"><p className="text-xl sm:text-2xl font-bold text-emerald-600">{analytics.totals.clicked}</p></CardContent></Card>
               </div>
 
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 sm:flex-wrap">
                 <Select value={filterPanchayath} onValueChange={setFilterPanchayath}>
-                  <SelectTrigger className="flex-1 min-w-[140px] h-9"><SelectValue placeholder="Panchayath" /></SelectTrigger>
+                  <SelectTrigger className="sm:flex-1 sm:min-w-[140px] h-9 text-xs sm:text-sm"><SelectValue placeholder="Panchayath" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Panchayaths</SelectItem>
                     {uniquePanchayaths.map((p: any) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={filterWard} onValueChange={setFilterWard}>
-                  <SelectTrigger className="w-28 h-9"><SelectValue placeholder="Ward" /></SelectTrigger>
+                  <SelectTrigger className="sm:w-28 h-9 text-xs sm:text-sm"><SelectValue placeholder="Ward" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Wards</SelectItem>
                     {uniqueWards.map((w: any) => <SelectItem key={w} value={String(w)}>Ward {w}</SelectItem>)}
                   </SelectContent>
                 </Select>
-                <Button size="sm" variant="outline" onClick={exportGroupsCSV} className="h-9">
-                  <Download className="h-4 w-4 sm:mr-1" /> <span className="hidden sm:inline">Export</span>
+                <Button size="sm" variant="outline" onClick={exportGroupsCSV} className="h-9 col-span-2 sm:col-span-1">
+                  <Download className="h-4 w-4 mr-1" /> Export
                 </Button>
               </div>
+
 
               <Accordion type="multiple" className="w-full">
                 <AccordionItem value="by-panchayath">
@@ -574,8 +575,8 @@ const NotificationsPage = () => {
                           return (
                             <AccordionItem key={panchayath} value={panchayath} className="border rounded-md px-3">
                               <AccordionTrigger className="hover:no-underline py-3">
-                                <div className="flex-1 flex items-center justify-between gap-2 pr-2 min-w-0">
-                                  <span className="font-medium text-sm sm:text-base truncate text-left">{panchayath}</span>
+                                <div className="flex-1 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 sm:gap-2 pr-2 min-w-0 text-left">
+                                  <span className="font-medium text-sm sm:text-base truncate">{panchayath}</span>
                                   <div className="flex items-center gap-1.5 text-xs shrink-0">
                                     <Badge variant="outline" className="font-normal">D {subtotal.d}</Badge>
                                     <Badge variant="outline" className="font-normal text-primary border-primary/40">R {subtotal.r}</Badge>
@@ -594,7 +595,31 @@ const NotificationsPage = () => {
                                     <MessageCircle className="h-3.5 w-3.5 mr-1" /> Share to WhatsApp
                                   </Button>
                                 </div>
-                                <div className="overflow-x-auto">
+                                {/* Mobile: card list */}
+                                <div className="sm:hidden space-y-2">
+                                  {[...groups]
+                                    .sort((a: any, b: any) => (Number(a.ward_number) || 0) - (Number(b.ward_number) || 0))
+                                    .map((g: any, i: number) => (
+                                      <div key={`m-${panchayath}-${i}`} className="border rounded-md p-2.5 text-sm flex items-center justify-between gap-2">
+                                        <span className="font-medium">Ward {g.ward_number ?? "-"}</span>
+                                        <div className="flex items-center gap-1.5 text-xs shrink-0">
+                                          <Badge variant="outline" className="font-normal">D {g.delivered}</Badge>
+                                          <Badge variant="outline" className="font-normal text-primary border-primary/40">R {g.read}</Badge>
+                                          <Badge variant="outline" className="font-normal text-emerald-600 border-emerald-600/40">C {g.clicked}</Badge>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  <div className="border rounded-md p-2.5 text-sm flex items-center justify-between gap-2 bg-muted/40">
+                                    <span className="font-semibold text-xs">Subtotal</span>
+                                    <div className="flex items-center gap-1.5 text-xs shrink-0">
+                                      <Badge variant="outline" className="font-semibold">D {subtotal.d}</Badge>
+                                      <Badge variant="outline" className="font-semibold text-primary border-primary/40">R {subtotal.r}</Badge>
+                                      <Badge variant="outline" className="font-semibold text-emerald-600 border-emerald-600/40">C {subtotal.c}</Badge>
+                                    </div>
+                                  </div>
+                                </div>
+                                {/* Desktop: table */}
+                                <div className="hidden sm:block overflow-x-auto">
                                   <Table>
                                     <TableHeader>
                                       <TableRow>
@@ -626,6 +651,7 @@ const NotificationsPage = () => {
                                 </div>
                               </AccordionContent>
                             </AccordionItem>
+
                           );
                         })}
                       </Accordion>
@@ -649,8 +675,8 @@ const NotificationsPage = () => {
                             return (
                               <AccordionItem key={role} value={role} className="border rounded-md px-3">
                                 <AccordionTrigger className="hover:no-underline py-3">
-                                  <div className="flex-1 flex items-center justify-between gap-2 pr-2 min-w-0">
-                                    <span className="font-medium text-sm sm:text-base truncate text-left">
+                                  <div className="flex-1 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 sm:gap-2 pr-2 min-w-0 text-left">
+                                    <span className="font-medium text-sm sm:text-base truncate">
                                       {role} <span className="text-xs text-muted-foreground">({users.length})</span>
                                     </span>
                                     <div className="flex items-center gap-1.5 text-xs shrink-0">
@@ -759,8 +785,8 @@ const NotificationsPage = () => {
                             return (
                               <AccordionItem key={panchayath} value={panchayath} className="border rounded-md px-3">
                                 <AccordionTrigger className="hover:no-underline py-3">
-                                  <div className="flex-1 flex items-center justify-between gap-2 pr-2 min-w-0">
-                                    <span className="font-medium text-sm sm:text-base truncate text-left">
+                                  <div className="flex-1 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 sm:gap-2 pr-2 min-w-0 text-left">
+                                    <span className="font-medium text-sm sm:text-base truncate">
                                       {panchayath} <span className="text-xs text-muted-foreground">({users.length})</span>
                                     </span>
                                     <div className="flex items-center gap-1.5 text-xs shrink-0">
