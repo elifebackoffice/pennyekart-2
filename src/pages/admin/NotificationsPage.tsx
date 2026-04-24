@@ -257,6 +257,35 @@ const NotificationsPage = () => {
     return acc;
   }, {} as Record<string, any[]>);
 
+  // Group users by role for the role-based drilldown
+  const groupedUsersByRole: Record<string, any[]> = filteredUsers.reduce((acc: Record<string, any[]>, u: any) => {
+    const key = u.role_name || "No Role";
+    (acc[key] = acc[key] || []).push(u);
+    return acc;
+  }, {} as Record<string, any[]>);
+
+  const shareRoleUsersToWhatsApp = (role: string, users: any[]) => {
+    const d = users.filter((u) => u.delivered_at).length;
+    const r = users.filter((u) => u.read_at).length;
+    const c = users.filter((u) => u.clicked_at).length;
+    const lines = [
+      `*${analyticsFor?.title || "Notification"}*`,
+      `👤 *${role}* — Per-User`,
+      ``,
+      `Users: ${users.length}  |  Delivered: ${d}  |  Read: ${r}  |  Clicked: ${c}`,
+      ``,
+      `*Users:*`,
+      ...[...users]
+        .sort((a, b) => String(a.local_body_name || "").localeCompare(String(b.local_body_name || "")))
+        .map(
+          (u) =>
+            `• ${u.full_name || "-"} (${u.mobile_number || "-"}) ${u.local_body_name || "-"} W${u.ward_number ?? "-"} — ${u.read_at ? "✅Read" : u.delivered_at ? "📨Delivered" : "—"}${u.clicked_at ? " 🔗" : ""}`
+        ),
+    ];
+    const text = encodeURIComponent(lines.join("\n"));
+    window.open(`https://wa.me/?text=${text}`, "_blank");
+  };
+
   const shareUsersToWhatsApp = (panchayath: string, users: any[]) => {
     const d = users.filter((u) => u.delivered_at).length;
     const r = users.filter((u) => u.read_at).length;
