@@ -328,12 +328,14 @@ const NotificationsPage = () => {
               <TableBody>
                 {notifications.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                       No notifications yet
                     </TableCell>
                   </TableRow>
                 ) : (
-                  notifications.map((n) => (
+                  notifications.map((n) => {
+                    const c = viewCounts[n.id] || { delivered: 0, read: 0, clicked: 0 };
+                    return (
                     <TableRow key={n.id}>
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -351,6 +353,18 @@ const NotificationsPage = () => {
                         <Badge variant={n.is_active ? "default" : "secondary"}>
                           {n.is_active ? "Active" : "Inactive"}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <button
+                          onClick={() => openAnalytics(n)}
+                          className="inline-flex flex-col items-center gap-0.5 text-xs hover:text-primary transition-colors"
+                          title="Delivered / Read / Clicked"
+                        >
+                          <span className="font-semibold text-sm">{c.read}</span>
+                          <span className="text-muted-foreground">
+                            {c.delivered}d · {c.clicked}c
+                          </span>
+                        </button>
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
                         {new Date(n.created_at).toLocaleDateString()}
