@@ -785,8 +785,8 @@ const NotificationsPage = () => {
                             return (
                               <AccordionItem key={panchayath} value={panchayath} className="border rounded-md px-3">
                                 <AccordionTrigger className="hover:no-underline py-3">
-                                  <div className="flex-1 flex items-center justify-between gap-2 pr-2 min-w-0">
-                                    <span className="font-medium text-sm sm:text-base truncate text-left">
+                                  <div className="flex-1 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 sm:gap-2 pr-2 min-w-0 text-left">
+                                    <span className="font-medium text-sm sm:text-base truncate">
                                       {panchayath} <span className="text-xs text-muted-foreground">({users.length})</span>
                                     </span>
                                     <div className="flex items-center gap-1.5 text-xs shrink-0">
