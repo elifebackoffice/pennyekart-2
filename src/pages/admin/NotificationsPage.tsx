@@ -43,6 +43,7 @@ const NotificationsPage = () => {
   const { session } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [localBodies, setLocalBodies] = useState<LocalBody[]>([]);
+  const [viewCounts, setViewCounts] = useState<Record<string, { delivered: number; read: number; clicked: number }>>({});
   const [editing, setEditing] = useState<Partial<Notification> | null>(null);
   const [analyticsFor, setAnalyticsFor] = useState<Notification | null>(null);
   const [analytics, setAnalytics] = useState<any>(null);
@@ -51,12 +52,21 @@ const NotificationsPage = () => {
   const [filterWard, setFilterWard] = useState("all");
 
   const fetchData = async () => {
-    const [{ data: notifs }, { data: lbs }] = await Promise.all([
+    const [{ data: notifs }, { data: lbs }, { data: reads }] = await Promise.all([
       supabase.from("notifications").select("*").order("created_at", { ascending: false }),
       supabase.from("locations_local_bodies").select("id, name, body_type").eq("is_active", true).order("name"),
+      supabase.from("notification_reads").select("notification_id, read_at, clicked_at"),
     ]);
     setNotifications((notifs ?? []) as Notification[]);
     setLocalBodies(lbs ?? []);
+    const counts: Record<string, { delivered: number; read: number; clicked: number }> = {};
+    for (const r of reads ?? []) {
+      const c = (counts[r.notification_id] = counts[r.notification_id] || { delivered: 0, read: 0, clicked: 0 });
+      c.delivered++;
+      if (r.read_at) c.read++;
+      if (r.clicked_at) c.clicked++;
+    }
+    setViewCounts(counts);
   };
 
   useEffect(() => {
@@ -310,6 +320,7 @@ const NotificationsPage = () => {
                   <TableHead>Title</TableHead>
                   <TableHead>Target</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead className="text-center">Views</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -317,12 +328,14 @@ const NotificationsPage = () => {
               <TableBody>
                 {notifications.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                       No notifications yet
                     </TableCell>
                   </TableRow>
                 ) : (
-                  notifications.map((n) => (
+                  notifications.map((n) => {
+                    const c = viewCounts[n.id] || { delivered: 0, read: 0, clicked: 0 };
+                    return (
                     <TableRow key={n.id}>
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -341,6 +354,18 @@ const NotificationsPage = () => {
                           {n.is_active ? "Active" : "Inactive"}
                         </Badge>
                       </TableCell>
+                      <TableCell className="text-center">
+                        <button
+                          onClick={() => openAnalytics(n)}
+                          className="inline-flex flex-col items-center gap-0.5 text-xs hover:text-primary transition-colors"
+                          title="Delivered / Read / Clicked"
+                        >
+                          <span className="font-semibold text-sm">{c.read}</span>
+                          <span className="text-muted-foreground">
+                            {c.delivered}d · {c.clicked}c
+                          </span>
+                        </button>
+                      </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
                         {new Date(n.created_at).toLocaleDateString()}
                       </TableCell>
@@ -356,7 +381,8 @@ const NotificationsPage = () => {
                         </Button>
                       </TableCell>
                     </TableRow>
-                  ))
+                    );
+                  })
                 )}
               </TableBody>
             </Table>
