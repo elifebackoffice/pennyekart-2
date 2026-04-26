@@ -32,9 +32,9 @@ const navItems = [
   { label: "Penny Prime", icon: Handshake, path: "/admin/penny-prime", perm: "read_penny_prime" },
   { label: "Sales Report", icon: BarChart3, path: "/admin/sales-report", perm: "read_reports" },
   { label: "Reports", icon: BarChart3, path: "/admin/reports", perm: "read_reports" },
-  { label: "Chatbot Settings", icon: Bot, path: "/admin/chatbot", perm: "read_settings" },
-  { label: "Notifications", icon: Bell, path: "/admin/notifications", perm: "read_settings" },
-  { label: "Scratch & Win", icon: Gift, path: "/admin/scratch-rewards", perm: "read_settings" },
+  { label: "Chatbot Settings", icon: Bot, path: "/admin/chatbot", perm: "read_chatbot" },
+  { label: "Notifications", icon: Bell, path: "/admin/notifications", perm: "read_notifications" },
+  { label: "Scratch & Win", icon: Gift, path: "/admin/scratch-rewards", perm: "read_scratch_rewards" },
 ];
 
 const NavItems = ({ items, currentPath, onNavigate }: { items: typeof navItems; currentPath: string; onNavigate?: () => void }) => (
