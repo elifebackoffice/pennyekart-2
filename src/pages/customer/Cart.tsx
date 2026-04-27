@@ -680,7 +680,7 @@ const Cart = () => {
                 variant="ghost"
                 size="sm"
                 className="w-full text-xs text-muted-foreground hover:text-foreground"
-                onClick={() => navigate("/customer/profile?section=addresses")}
+                onClick={() => navigate("/customer/profile?tab=addresses")}
               >
                 <UserCog className="h-3.5 w-3.5 mr-1.5" /> Manage in Profile
               </Button>
