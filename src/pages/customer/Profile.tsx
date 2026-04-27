@@ -510,14 +510,78 @@ const Profile = () => {
         {/* Addresses Section */}
         {activeSection === "addresses" && (
           <Card>
-            <CardContent className="p-8 text-center text-muted-foreground">
-              <MapPin className="h-10 w-10 mx-auto mb-2 opacity-40" />
-              <p className="font-medium">Saved Addresses</p>
-              <p className="text-sm mt-1">No saved addresses yet</p>
-              <Button size="sm" className="mt-4">Add Address</Button>
+            <CardContent className="p-4 sm:p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-primary" />
+                    My Delivery Location
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Used for order delivery and tracking.
+                  </p>
+                </div>
+                <Button size="sm" onClick={() => setPickerOpen(true)}>
+                  {savedAddress ? "Update" : "Add"}
+                </Button>
+              </div>
+
+              {savedAddress ? (
+                <div className="space-y-3">
+                  <div className="rounded-md border border-border bg-muted/30 p-3 space-y-1">
+                    <p className="text-sm">{savedAddress}</p>
+                    {savedLat && savedLng && (
+                      <p className="text-xs text-muted-foreground">
+                        Lat: {savedLat.toFixed(6)}, Lng: {savedLng.toFixed(6)}
+                      </p>
+                    )}
+                  </div>
+                  {savedLat && savedLng && (
+                    <div className="rounded-md overflow-hidden border border-border">
+                      <iframe
+                        title="Saved location preview"
+                        width="100%"
+                        height="220"
+                        style={{ border: 0 }}
+                        loading="lazy"
+                        referrerPolicy="no-referrer-when-downgrade"
+                        src={`https://www.google.com/maps?q=${savedLat},${savedLng}&z=16&output=embed`}
+                      />
+                    </div>
+                  )}
+                  {savedLat && savedLng && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={() =>
+                        window.open(`https://www.google.com/maps?q=${savedLat},${savedLng}`, "_blank")
+                      }
+                    >
+                      <ExternalLink className="h-4 w-4 mr-2" /> Open in Google Maps
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-6 text-muted-foreground">
+                  <MapPin className="h-10 w-10 mx-auto mb-2 opacity-40" />
+                  <p className="text-sm">No location saved yet</p>
+                  <p className="text-xs mt-1">Add your delivery location on the map.</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
+
+        <LocationPicker
+          open={pickerOpen}
+          onOpenChange={setPickerOpen}
+          initialLat={savedLat}
+          initialLng={savedLng}
+          initialAddress={savedAddress}
+          onConfirm={handleSaveLocation}
+          title="Set your delivery location"
+        />
 
         {/* Wishlist Section */}
         {activeSection === "wishlist" && (
