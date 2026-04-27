@@ -888,30 +888,17 @@ const Cart = () => {
         </div>
       </div>
 
-      {/* Delivery Address Dialog */}
-      <Dialog open={showAddressDialog} onOpenChange={setShowAddressDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Delivery Address</DialogTitle>
-            <DialogDescription>Enter your delivery address. This will be saved for future orders.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 py-2">
-            <Textarea
-              value={deliveryAddress}
-              onChange={(e) => setDeliveryAddress(e.target.value)}
-              placeholder="Enter full delivery address (House no, Street, Landmark, Pincode...)"
-              rows={4}
-              className="text-sm"
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddressDialog(false)}>Cancel</Button>
-            <Button onClick={handleSaveAddress} disabled={addressLoading || !deliveryAddress.trim()}>
-              {addressLoading ? "Saving..." : "Save & Continue"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Delivery Location Picker (Google Map) */}
+      <LocationPicker
+        open={showLocationPicker}
+        onOpenChange={setShowLocationPicker}
+        initialLat={savedLat}
+        initialLng={savedLng}
+        initialAddress={savedAddress}
+        onConfirm={handlePickerSave}
+        title="Set delivery location"
+        description="Pick the exact spot on the map where you want your order delivered."
+      />
 
       {/* Payment Method Dialog */}
       <Dialog open={showPayment} onOpenChange={setShowPayment}>
