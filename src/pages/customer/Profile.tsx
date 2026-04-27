@@ -18,6 +18,7 @@ import { useNotifications } from "@/hooks/useNotifications";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import NotificationDetailDialog from "@/components/NotificationDetailDialog";
 import ScratchCardWidget from "@/components/ScratchCardWidget";
+import LocationPicker, { PickedLocation } from "@/components/LocationPicker";
 
 interface Order {
   id: string;
@@ -69,6 +70,46 @@ const Profile = () => {
   const { notifications, loading: notificationsLoading, markRead } = useNotifications();
   const [selectedNotification, setSelectedNotification] = useState<any>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [savedAddress, setSavedAddress] = useState<string | null>(null);
+  const [savedLat, setSavedLat] = useState<number | null>(null);
+  const [savedLng, setSavedLng] = useState<number | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  // Load saved location whenever user is available or addresses tab opens
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from("profiles")
+      .select("business_address, latitude, longitude")
+      .eq("user_id", user.id)
+      .maybeSingle()
+      .then(({ data }: any) => {
+        if (!data) return;
+        setSavedAddress(data.business_address ?? null);
+        setSavedLat(data.latitude ?? null);
+        setSavedLng(data.longitude ?? null);
+      });
+  }, [user, activeSection]);
+
+  const handleSaveLocation = async (loc: PickedLocation) => {
+    if (!user) return;
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        business_address: loc.address,
+        latitude: loc.lat,
+        longitude: loc.lng,
+      } as any)
+      .eq("user_id", user.id);
+    if (error) {
+      toast.error("Failed to save location");
+      return;
+    }
+    setSavedAddress(loc.address);
+    setSavedLat(loc.lat);
+    setSavedLng(loc.lng);
+    toast.success("Location saved");
+  };
 
   useEffect(() => {
     if (!authLoading && !user) {
