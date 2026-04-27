@@ -14,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import WalletRewardPopup from "@/components/WalletRewardPopup";
 import { useDeliveryCharge } from "@/hooks/useDeliveryCharge";
+import LocationPicker, { PickedLocation } from "@/components/LocationPicker";
 
 const Cart = () => {
   const navigate = useNavigate();
@@ -22,6 +23,7 @@ const Cart = () => {
   const { user } = useAuth();
   const [showPayment, setShowPayment] = useState(false);
   const [showAddressDialog, setShowAddressDialog] = useState(false);
+  const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("cod");
   const [placingOrder, setPlacingOrder] = useState(false);
 
@@ -308,33 +310,35 @@ const Cart = () => {
       return;
     }
 
-    // Show address dialog if no saved address, otherwise go to payment
-    if (!savedAddress) {
-      setShowAddressDialog(true);
+    // Show map picker if no saved location, otherwise go to payment
+    if (!savedAddress || !savedLat || !savedLng) {
+      setShowLocationPicker(true);
     } else {
       setShowPayment(true);
     }
   };
 
-  const handleSaveAddress = async () => {
-    if (!deliveryAddress.trim()) {
-      toast.error("Please enter a delivery address");
+  const handlePickerSave = async (loc: PickedLocation) => {
+    if (!user) return;
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        business_address: loc.address,
+        latitude: loc.lat,
+        longitude: loc.lng,
+      } as any)
+      .eq("user_id", user.id);
+    if (error) {
+      toast.error("Failed to save location");
       return;
     }
-    setAddressLoading(true);
-    try {
-      await supabase
-        .from("profiles")
-        .update({ business_address: deliveryAddress.trim() } as any)
-        .eq("user_id", user!.id);
-      setSavedAddress(deliveryAddress.trim());
-      setShowAddressDialog(false);
-      setShowPayment(true);
-    } catch {
-      toast.error("Failed to save address");
-    } finally {
-      setAddressLoading(false);
-    }
+    setSavedAddress(loc.address);
+    setDeliveryAddress(loc.address);
+    setSavedLat(loc.lat);
+    setSavedLng(loc.lng);
+    toast.success("Location saved");
+    // After picking, jump straight to payment
+    setShowPayment(true);
   };
 
   const handleConfirmOrder = async () => {
@@ -884,30 +888,17 @@ const Cart = () => {
         </div>
       </div>
 
-      {/* Delivery Address Dialog */}
-      <Dialog open={showAddressDialog} onOpenChange={setShowAddressDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Delivery Address</DialogTitle>
-            <DialogDescription>Enter your delivery address. This will be saved for future orders.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 py-2">
-            <Textarea
-              value={deliveryAddress}
-              onChange={(e) => setDeliveryAddress(e.target.value)}
-              placeholder="Enter full delivery address (House no, Street, Landmark, Pincode...)"
-              rows={4}
-              className="text-sm"
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddressDialog(false)}>Cancel</Button>
-            <Button onClick={handleSaveAddress} disabled={addressLoading || !deliveryAddress.trim()}>
-              {addressLoading ? "Saving..." : "Save & Continue"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Delivery Location Picker (Google Map) */}
+      <LocationPicker
+        open={showLocationPicker}
+        onOpenChange={setShowLocationPicker}
+        initialLat={savedLat}
+        initialLng={savedLng}
+        initialAddress={savedAddress}
+        onConfirm={handlePickerSave}
+        title="Set delivery location"
+        description="Pick the exact spot on the map where you want your order delivered."
+      />
 
       {/* Payment Method Dialog */}
       <Dialog open={showPayment} onOpenChange={setShowPayment}>
@@ -917,13 +908,30 @@ const Cart = () => {
             <DialogDescription>Choose how you'd like to pay for your order.</DialogDescription>
           </DialogHeader>
           {/* Show delivery address */}
-          <div className="rounded-md border border-border bg-muted/50 p-3 flex items-start gap-2">
-            <MapPin className="h-4 w-4 shrink-0 text-muted-foreground mt-0.5" />
-            <div className="flex-1">
-              <p className="text-xs font-medium text-muted-foreground">Delivering to</p>
-              <p className="text-sm text-foreground">{deliveryAddress}</p>
+          <div className="rounded-md border border-border bg-muted/50 p-3 space-y-2">
+            <div className="flex items-start gap-2">
+              <MapPin className="h-4 w-4 shrink-0 text-muted-foreground mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-muted-foreground">Delivering to</p>
+                <p className="text-sm text-foreground break-words">{deliveryAddress || "No address set"}</p>
+                {savedLat && savedLng && (
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    {savedLat.toFixed(5)}, {savedLng.toFixed(5)}
+                  </p>
+                )}
+              </div>
             </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="w-full"
+              onClick={() => { setShowPayment(false); setShowLocationPicker(true); }}
+            >
+              <MapPin className="h-3.5 w-3.5 mr-1.5" /> Update location on map
+            </Button>
           </div>
+
           <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod} className="gap-3 py-2">
             <div className="flex items-center space-x-3 rounded-lg border border-border p-3">
               <RadioGroupItem value="cod" id="cod" />
