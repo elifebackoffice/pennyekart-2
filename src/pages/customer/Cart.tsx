@@ -908,13 +908,30 @@ const Cart = () => {
             <DialogDescription>Choose how you'd like to pay for your order.</DialogDescription>
           </DialogHeader>
           {/* Show delivery address */}
-          <div className="rounded-md border border-border bg-muted/50 p-3 flex items-start gap-2">
-            <MapPin className="h-4 w-4 shrink-0 text-muted-foreground mt-0.5" />
-            <div className="flex-1">
-              <p className="text-xs font-medium text-muted-foreground">Delivering to</p>
-              <p className="text-sm text-foreground">{deliveryAddress}</p>
+          <div className="rounded-md border border-border bg-muted/50 p-3 space-y-2">
+            <div className="flex items-start gap-2">
+              <MapPin className="h-4 w-4 shrink-0 text-muted-foreground mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-muted-foreground">Delivering to</p>
+                <p className="text-sm text-foreground break-words">{deliveryAddress || "No address set"}</p>
+                {savedLat && savedLng && (
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    {savedLat.toFixed(5)}, {savedLng.toFixed(5)}
+                  </p>
+                )}
+              </div>
             </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="w-full"
+              onClick={() => { setShowPayment(false); setShowLocationPicker(true); }}
+            >
+              <MapPin className="h-3.5 w-3.5 mr-1.5" /> Update location on map
+            </Button>
           </div>
+
           <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod} className="gap-3 py-2">
             <div className="flex items-center space-x-3 rounded-lg border border-border p-3">
               <RadioGroupItem value="cod" id="cod" />
