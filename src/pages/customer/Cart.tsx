@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Minus, Plus, Trash2, ShieldCheck, Clock, MapPin, Share2, LocateFixed } from "lucide-react";
+import { ArrowLeft, Minus, Plus, Trash2, ShieldCheck, Clock, MapPin, ExternalLink, UserCog } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/hooks/useCart";
 import { useAuth } from "@/hooks/useAuth";
@@ -8,8 +8,6 @@ import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import WalletRewardPopup from "@/components/WalletRewardPopup";
@@ -22,17 +20,14 @@ const Cart = () => {
   const { items, updateQuantity, removeItem, clearCart, totalPrice, totalItems } = useCart();
   const { user } = useAuth();
   const [showPayment, setShowPayment] = useState(false);
-  const [showAddressDialog, setShowAddressDialog] = useState(false);
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("cod");
   const [placingOrder, setPlacingOrder] = useState(false);
 
   const [deliveryAddress, setDeliveryAddress] = useState("");
   const [savedAddress, setSavedAddress] = useState<string | null>(null);
-  const [addressLoading, setAddressLoading] = useState(false);
   const [savedLat, setSavedLat] = useState<number | null>(null);
   const [savedLng, setSavedLng] = useState<number | null>(null);
-  const [locatingGps, setLocatingGps] = useState(false);
 
   const [couponCode, setCouponCode] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discount: number; collabId?: string } | null>(null);
