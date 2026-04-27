@@ -339,26 +339,6 @@ const Cart = () => {
     toast.success("Location saved");
     // After picking, jump straight to payment
     setShowPayment(true);
-
-  const handleSaveAddress = async () => {
-    if (!deliveryAddress.trim()) {
-      toast.error("Please enter a delivery address");
-      return;
-    }
-    setAddressLoading(true);
-    try {
-      await supabase
-        .from("profiles")
-        .update({ business_address: deliveryAddress.trim() } as any)
-        .eq("user_id", user!.id);
-      setSavedAddress(deliveryAddress.trim());
-      setShowAddressDialog(false);
-      setShowPayment(true);
-    } catch {
-      toast.error("Failed to save address");
-    } finally {
-      setAddressLoading(false);
-    }
   };
 
   const handleConfirmOrder = async () => {
