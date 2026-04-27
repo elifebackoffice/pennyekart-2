@@ -14,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import WalletRewardPopup from "@/components/WalletRewardPopup";
 import { useDeliveryCharge } from "@/hooks/useDeliveryCharge";
+import LocationPicker, { PickedLocation } from "@/components/LocationPicker";
 
 const Cart = () => {
   const navigate = useNavigate();
@@ -22,6 +23,7 @@ const Cart = () => {
   const { user } = useAuth();
   const [showPayment, setShowPayment] = useState(false);
   const [showAddressDialog, setShowAddressDialog] = useState(false);
+  const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("cod");
   const [placingOrder, setPlacingOrder] = useState(false);
 
@@ -308,13 +310,35 @@ const Cart = () => {
       return;
     }
 
-    // Show address dialog if no saved address, otherwise go to payment
-    if (!savedAddress) {
-      setShowAddressDialog(true);
+    // Show map picker if no saved location, otherwise go to payment
+    if (!savedAddress || !savedLat || !savedLng) {
+      setShowLocationPicker(true);
     } else {
       setShowPayment(true);
     }
   };
+
+  const handlePickerSave = async (loc: PickedLocation) => {
+    if (!user) return;
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        business_address: loc.address,
+        latitude: loc.lat,
+        longitude: loc.lng,
+      } as any)
+      .eq("user_id", user.id);
+    if (error) {
+      toast.error("Failed to save location");
+      return;
+    }
+    setSavedAddress(loc.address);
+    setDeliveryAddress(loc.address);
+    setSavedLat(loc.lat);
+    setSavedLng(loc.lng);
+    toast.success("Location saved");
+    // After picking, jump straight to payment
+    setShowPayment(true);
 
   const handleSaveAddress = async () => {
     if (!deliveryAddress.trim()) {
